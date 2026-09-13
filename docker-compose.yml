@@ -1,0 +1,77 @@
+# Local development stack.
+#
+# This composes a working platform for development and integration testing. It is
+# not a production topology: production runs managed PostgreSQL with encryption at
+# rest, automated backups and point-in-time recovery, Redis in a replicated
+# configuration, and the API behind the state's API gateway. See
+# docs/deployment.md.
+
+name: pcid
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: pcid
+      POSTGRES_PASSWORD: pcid-local-development
+      POSTGRES_DB: pcid
+      # Checksums catch silent corruption; the production cluster runs with them.
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    ports: ['5432:5432']
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pcid -d pcid']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    ports: ['6379:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: .
+    command: ['node', 'services/api/dist/database/migrate-cli.js']
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://pcid:pcid-local-development@postgres:5432/pcid
+      DATABASE_SSL: require
+      TOKEN_SIGNING_KEY: ${TOKEN_SIGNING_KEY:?set TOKEN_SIGNING_KEY}
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:?set SECRET_ENCRYPTION_KEY}
+      ALLOW_SANDBOX_ADAPTERS: 'false'
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: on-failure
+
+  api:
+    build: .
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://pcid:pcid-local-development@postgres:5432/pcid
+      DATABASE_SSL: require
+      REDIS_URL: redis://redis:6379
+      TOKEN_SIGNING_KEY: ${TOKEN_SIGNING_KEY:?set TOKEN_SIGNING_KEY}
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:?set SECRET_ENCRYPTION_KEY}
+      PLATFORM_BASE_URL: http://localhost:3000
+      ALLOW_SANDBOX_ADAPTERS: 'false'
+    ports: ['3000:3000']
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    read_only: true
+    tmpfs: ['/tmp']
+    security_opt: ['no-new-privileges:true']
+    cap_drop: ['ALL']
+
+volumes:
+  postgres-data:

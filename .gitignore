@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+!.env.example
+npm-debug.log*
+.DS_Store
+.next/
+out/
+tmp/
+*.log
+docs/openapi.json
+dist-test/

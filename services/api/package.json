@@ -1,0 +1,40 @@
+{
+  "name": "@pcid/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "start": "node dist/main.js",
+    "dev": "node --import tsx --watch src/main.ts",
+    "db:migrate": "node --import tsx src/database/migrate-cli.ts",
+    "db:seed": "node --import tsx src/database/seed-cli.ts",
+    "openapi": "node --import tsx src/common/openapi/emit-cli.ts",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "node --import tsx --test \"test/unit/**/*.test.ts\"",
+    "test:integration": "npm run build:test && node --test --test-concurrency=1 \"dist-test/test/integration/**/*.test.js\"",
+    "db:bootstrap": "node --import tsx src/database/bootstrap-cli.ts",
+    "build:test": "tsc -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/platform-express": "^11.1.6",
+    "@nestjs/swagger": "^11.2.0",
+    "@pcid/contracts": "0.1.0",
+    "@pcid/policy": "0.1.0",
+    "helmet": "^8.1.0",
+    "ioredis": "^5.8.2",
+    "pg": "^8.16.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/pg": "^8.15.5",
+    "supertest": "^7.1.4",
+    "@types/supertest": "^6.0.3"
+  }
+}
