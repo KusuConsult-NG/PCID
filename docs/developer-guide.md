@@ -1,0 +1,208 @@
+# Developer guide
+
+## Setting up
+
+Node 22, PostgreSQL 16, and the PostgreSQL client tools for the disaster-recovery
+test.
+
+```bash
+npm install
+export TOKEN_SIGNING_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+export SECRET_ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+export DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/pcid
+export TEST_ADMIN_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres
+
+createdb pcid && npm run db:migrate && npm run db:seed
+npm run dev:api
+```
+
+## Layout, and the dependency rule
+
+```
+packages/contracts   Vocabulary. Depends on nothing.
+packages/policy      The engine. Depends on contracts only. No I/O.
+services/api         Everything else. Depends on both.
+```
+
+The rule is one-directional and worth protecting: `@pcid/policy` must never import
+from `services/api`. Its value is that it can be reasoned about and tested
+exhaustively without a database, and a single import would end that.
+
+## Tests
+
+```bash
+npm run test:unit                                    # contracts, policy, security primitives
+npm run test:integration --workspace services/api    # the API against a real database
+npm run verify                                       # format, lint, typecheck, unit
+```
+
+Integration tests compile with `tsc` and run against the compiled output, because
+esbuild-based loaders do not emit decorator metadata and Nest's dependency
+injection needs it. Running them against `dist-test` means the suite exercises the
+application that actually ships.
+
+Each integration suite creates and drops its own database, so they are isolated
+and can be run repeatedly.
+
+### The TOTP wrinkle
+
+The platform refuses a TOTP time step at or below the last one used, which is
+correct — a code should not work twice — and awkward for tests that sign in
+several times inside one 30-second window. The harness tracks used steps per
+secret and generates a code for the next step, which the server's ±1 window still
+accepts. Only a burst of more than two sign-ins per secret has to wait.
+
+If a test suddenly takes 30 seconds, that is why: share a session instead of
+signing in again. Sharing is also the better assertion, since entitlements are
+re-read per request.
+
+## Adding a field
+
+This is the change people get wrong, so it is worth doing in order.
+
+1. **Migration.** Add the column. Never edit an applied migration — the runner
+   compares checksums and refuses.
+2. **Catalogue.** Add an entry to
+   [`field-catalogue.ts`](../packages/contracts/src/field-catalogue.ts): its
+   classification, the closed set of purposes it may be released for, whether it
+   needs an approval, whether it is part of the emergency profile, whether the
+   citizen sees it. **Until you do this, the field is unreachable** — which is the
+   safe default.
+3. **Mapper.** Add it to the resource's field-values mapper (for example
+   [`citizen.mapper.ts`](../services/api/src/identity/citizen.mapper.ts)). This is
+   the only place physical columns meet catalogue paths.
+4. **Test.** Prove it is released for the purposes it should be, and withheld for
+   the ones it should not.
+
+Nothing else is needed. Services project through the decision, so a correctly
+catalogued field appears for exactly the callers entitled to it.
+
+## Adding an endpoint
+
+```ts
+documentRoute({
+  method: 'get',
+  path: '/api/v1/things/:id',
+  tag: 'Things',
+  summary: 'Read a thing',
+  parameters: [
+    { name: 'id', in: 'path', description: 'Thing id.' },
+    { name: 'purpose', in: 'query', required: true, description: 'The lawful purpose.' },
+  ],
+});
+
+@Get('things/:id')
+async read(@Actor() actor: AuthenticatedActor, @Param('id') id: string,
+           @Query() query: unknown, @Req() request: Request) {
+  const input = validate(thingQuerySchema, query);
+  return this.things.read(actor, id, input.purpose, contextOf(request));
+}
+```
+
+In the service:
+
+```ts
+const outcome = await this.policy.authorize({
+  actor,
+  action: 'THING_VIEW',
+  purpose,
+  resource: {
+    type: 'THING',
+    id,
+    classification: row?.classification ?? 'CONFIDENTIAL',
+    subjectPcid: row?.subject_pcid ?? null,
+  },
+  context,
+});
+if (row === null) throw AppError.notFoundOrNotPermitted(`no thing ${id}`);
+return {
+  data: project(outcome.decision, thingFieldValues(row)),
+  restrictedFields: withheld(outcome.decision),
+};
+```
+
+Four things to keep:
+
+- **Authorise before checking existence.** Then a record that does not exist and
+  one you may not see are indistinguishable — and both are audited.
+- **Never return a row object directly.** `project()` is the only supported way to
+  turn a stored record into a response.
+- **Add the route to
+  [`routes-index.ts`](../services/api/src/common/openapi/routes-index.ts)** so it
+  appears in the published contract.
+- **Routes are authenticated unless marked `@Public()`.** Forgetting the guard
+  fails closed.
+
+## Adding an action
+
+1. Add it to `ACTIONS` in [`actions.ts`](../packages/contracts/src/actions.ts).
+2. Add its lawful purposes to `ACTION_PURPOSES` **and** its resource types to
+   `ACTION_RESOURCE_TYPES` in
+   [`action-metadata.ts`](../packages/policy/src/action-metadata.ts). A test
+   asserts the two maps stay in lockstep, and an action missing from either is
+   unusable — the safe failure.
+3. Decide whether it reads citizen data (`CITIZEN_DATA_ACTIONS`), is a search
+   (`SEARCH_ACTIONS`), needs case linkage (`CASE_LINKAGE_REQUIRED_ACTIONS`),
+   addresses a case record (`CASE_RECORD_ACTIONS`), mutates
+   (`MUTATING_ACTIONS`) or needs step-up (`STEP_UP_ACTIONS`).
+4. Grant it to roles in [`roles.ts`](../packages/contracts/src/roles.ts). The seed
+   reconciles roles on every deploy, so this is the change — not a SQL update.
+5. Write the test that proves who may and may not use it.
+
+## Changing the policy engine
+
+Every change lands with a test, and the test should fail without the change.
+
+The engine is pure, so a test is a fixture and an assertion — no database, no
+HTTP. [`fixtures.ts`](../packages/policy/test/fixtures.ts) builds subjects,
+resources and contexts.
+
+Two rules that are not negotiable:
+
+- **Gate order is deliberate.** Gates 1–13 are absolute; 14–16 are binding gates a
+  break-glass grant may satisfy. Moving a gate between those groups changes what
+  break glass can do, which is a security decision, not a refactor.
+- **Never widen a decision outside the engine.** If a route needs something the
+  engine refuses, the engine is where it is argued, reviewed and tested.
+
+## Conventions
+
+- **No `any`.** Lint enforces it. The authorisation model is expressed in types;
+  `any` erases exactly the checking it depends on.
+- **Every SQL value is a bind parameter.** Use
+  [`WhereBuilder`](../services/api/src/common/sql.ts) for dynamic clauses — it has
+  no way to interpolate a value, so a refactor cannot make a query injectable.
+- **Operator logs carry identifiers and outcomes, never record contents.** They
+  must not become a second, unguarded copy of citizen data; the audit table is
+  where data access is recorded.
+- **Comments explain why.** The what is in the code. Where a rule comes from the
+  master system prompt, cite the section — it is what a reviewer needs.
+- **Prefer a database constraint** where one can hold an invariant. Application
+  code changes; a check constraint does not.
+
+## Debugging
+
+Every response carries `x-correlation-id`, which appears in the operator log and
+on the audit record:
+
+```sql
+SELECT occurred_at, action, outcome, purpose, decision_reasons, fields_withheld
+  FROM audit_event WHERE correlation_id = '<id>';
+```
+
+`decision_reasons` names the gate and code that refused, which is usually the
+whole answer. `GET /api/v1/auth/me` shows what the account can actually do.
+
+For an unexpected denial, the order of suspicion: is the agency active with a
+signed agreement; is the authenticator confirmed; does a role grant the action; is
+the purpose one that action allows; is the field catalogued for that purpose; is
+there a case or incident and is the account on it.
+
+## Pull requests
+
+- `npm run verify` and the integration suite pass.
+- Any authorisation change has a test that fails without it.
+- Any new field has a catalogue entry and a release test.
+- Migrations are new files, never edits.
+- Nothing in the diff logs a record value.
+- The API contract regenerates cleanly: `npm run openapi`.
