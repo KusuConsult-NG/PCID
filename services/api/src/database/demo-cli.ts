@@ -95,6 +95,27 @@ const OFFICERS: readonly DemoOfficer[] = [
     roles: ['DATA_PROTECTION_OFFICER', 'AUDITOR'],
     clearance: 'HIGHLY_RESTRICTED',
   },
+  {
+    email: 'investigator@demo.plateaustate.gov.ng',
+    fullName: 'Case Officer',
+    agencyCode: 'PLT-POLICE',
+    roles: ['INVESTIGATOR'],
+    clearance: 'LAW_ENFORCEMENT_RESTRICTED',
+  },
+  {
+    email: 'commander@demo.plateaustate.gov.ng',
+    fullName: 'Command Supervisor',
+    agencyCode: 'PLT-POLICE',
+    roles: ['SUPERVISOR'],
+    clearance: 'LAW_ENFORCEMENT_RESTRICTED',
+  },
+  {
+    email: 'missing@demo.plateaustate.gov.ng',
+    fullName: 'Missing Persons Desk',
+    agencyCode: 'PLT-POLICE',
+    roles: ['MISSING_PERSON_OFFICER'],
+    clearance: 'LAW_ENFORCEMENT_RESTRICTED',
+  },
 ];
 
 async function main(): Promise<void> {
@@ -243,6 +264,69 @@ async function main(): Promise<void> {
       config: { samplePcids: [registration.pcid] },
     });
     await api.post(adminToken, `/api/v1/integrations/${revenueSource.id}/sync`, undefined);
+
+    // Something for the security portal to show: an open case with the officer
+    // on it, a live missing-person enquiry, and somebody found who cannot say
+    // who they are. All through the ordinary routes, so the demo exercises the
+    // same authorisation as anybody else.
+    const investigatorToken = await api.signInWithStoredSecret(
+      'investigator@demo.plateaustate.gov.ng',
+      officerPasswords.get('investigator@demo.plateaustate.gov.ng') as string,
+    );
+    const openedCase = await api.post<{ caseNumber: string }>(investigatorToken, '/api/v1/cases', {
+      type: 'CRIMINAL_INVESTIGATION',
+      title: 'Warehouse burglary, Terminus market',
+      summary: 'Rear shutter forced overnight. Two witnesses named.',
+      lgaCode: 'PL-JNO',
+    });
+    await api.patch(investigatorToken, `/api/v1/cases/${openedCase.caseNumber}`, {
+      status: 'ACTIVE',
+    });
+    await api.post(investigatorToken, `/api/v1/cases/${openedCase.caseNumber}/notes`, {
+      body: 'Attended the scene at 07:40. Statements taken from the two witnesses.',
+    });
+
+    const missingOfficerToken = await api.signInWithStoredSecret(
+      'missing@demo.plateaustate.gov.ng',
+      officerPasswords.get('missing@demo.plateaustate.gov.ng') as string,
+    );
+    const missingPerson = await api.post<{ caseReference: string }>(
+      missingOfficerToken,
+      '/api/v1/missing-persons',
+      {
+        fullName: 'Rahila Choji',
+        ageYears: 16,
+        sex: 'FEMALE',
+        circumstances: 'Did not return from school on Tuesday afternoon.',
+        lastSeenAddress: 'Rukuba Road, Jos',
+        lastSeenLgaCode: 'PL-JNO',
+        physicalDescription: 'About 1.6m, plaited hair, green school uniform.',
+        reporterName: 'Mrs Choji',
+        reporterRelationship: 'Mother',
+        reporterPhone: '08035550001',
+      },
+    );
+    await api.post(
+      missingOfficerToken,
+      `/api/v1/missing-persons/${missingPerson.caseReference}/sightings`,
+      {
+        description:
+          'A caller reports a girl matching the description near the Rukuba Road junction.',
+        addressText: 'Rukuba Road junction',
+        lgaCode: 'PL-JNO',
+        reporterName: 'Passer-by',
+      },
+    );
+    await api.post(missingOfficerToken, '/api/v1/unidentified-persons', {
+      condition: 'UNCONSCIOUS',
+      estimatedAgeMin: 60,
+      estimatedAgeMax: 75,
+      apparentSex: 'MALE',
+      physicalDescription: 'Elderly man, grey beard, no identification on him.',
+      clothingDescription: 'Brown kaftan.',
+      foundAddress: 'Bukuru junction',
+      foundLgaCode: 'PL-JSO',
+    });
 
     // A message waiting in the portal inbox.
     await db.query(

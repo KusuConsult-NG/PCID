@@ -395,6 +395,183 @@ export class CasesService {
     return { caseNumber: row.case_number, userId, role };
   }
 
+  /**
+   * Change what a case says about itself (§22).
+   *
+   * `CASE_UPDATE` was granted to INVESTIGATOR and MISSING_PERSON_OFFICER with no
+   * route behind it, so a case could be opened and never corrected: a title
+   * typed wrong at three in the morning stayed wrong, and a case could not be
+   * moved from DRAFT to ACTIVE.
+   *
+   * Two things it deliberately will not do. It cannot close a case - that is
+   * `CASE_CLOSE`, a separate entitlement held by a supervisor, and it demands a
+   * closure note. And it cannot change the case's classification or its agency:
+   * those decide who may reach the case at all, so moving them is an
+   * administrative act and not an editorial one.
+   */
+  async update(
+    actor: AuthenticatedActor,
+    reference: string,
+    changes: {
+      title?: string;
+      summary?: string | null;
+      status?: 'DRAFT' | 'OPEN' | 'ACTIVE' | 'SUSPENDED' | 'PENDING_REVIEW';
+      lgaCode?: string | null;
+      wardCode?: string | null;
+    },
+    context: RequestContext,
+  ): Promise<Record<string, unknown>> {
+    const row = await this.findByReference(reference);
+    await this.policy.authorize({
+      actor,
+      action: 'CASE_UPDATE',
+      purpose:
+        row?.type === 'MISSING_PERSON' ? 'MISSING_PERSON_INVESTIGATION' : 'CRIMINAL_INVESTIGATION',
+      resource: {
+        type: 'CASE',
+        id: row?.id ?? null,
+        classification: (row?.classification ?? 'LAW_ENFORCEMENT_RESTRICTED') as Classification,
+        subjectPcid: null,
+        lgaCode: row?.lga_code ?? null,
+        linkedCaseIds: row === null ? [] : [row.id],
+      },
+      caseRef: reference,
+      context,
+    });
+    if (row === null) throw AppError.notFoundOrNotPermitted(`no case ${reference}`);
+    if (row.status === 'CLOSED' || row.status === 'ARCHIVED') {
+      throw AppError.conflict('A closed case cannot be edited. Reopening one is a supervisor act.');
+    }
+
+    const set: string[] = [];
+    const values: unknown[] = [row.id];
+    const applied: Record<string, unknown> = {};
+    const assign = (column: string, value: unknown, key: string): void => {
+      values.push(value);
+      set.push(`${column} = $${values.length}`);
+      applied[key] = value;
+    };
+    if (changes.title !== undefined) assign('title', changes.title, 'title');
+    if (changes.summary !== undefined) assign('summary', changes.summary, 'summary');
+    if (changes.status !== undefined) assign('status', changes.status, 'status');
+    if (changes.lgaCode !== undefined) assign('lga_code', changes.lgaCode, 'lgaCode');
+    if (changes.wardCode !== undefined) assign('ward_code', changes.wardCode, 'wardCode');
+
+    if (set.length === 0) {
+      throw AppError.validation('Nothing to change.', [
+        { path: 'body', message: 'Supply at least one field to update.' },
+      ]);
+    }
+
+    const updated = await this.db.queryOne<CaseRow>(
+      `UPDATE investigation_case SET ${set.join(', ')} WHERE id = $1
+         RETURNING id, case_number, type, title, summary, status, classification, agency_id,
+                   lga_code, ward_code, opened_at, closed_at`,
+      values,
+    );
+    if (updated === null) throw new Error('case update returned no row');
+
+    await this.audit.record({
+      action: 'CASE_UPDATE',
+      outcome: 'PERMITTED',
+      actorType: actor.subject.actorType,
+      actorId: actor.subject.userId,
+      actorDisplay: actor.displayName,
+      agencyId: actor.subject.agencyId,
+      agencyCode: actor.agencyCode,
+      roles: actor.subject.roles,
+      purpose: 'CRIMINAL_INVESTIGATION',
+      resourceType: 'CASE',
+      resourceId: row.id,
+      caseId: row.id,
+      caseNumber: row.case_number,
+      correlationId: context.correlationId,
+      ipAddress: context.ipAddress,
+      // What changed and what it was, so a later reader can see the case as it
+      // stood when a decision was taken on it.
+      detail: {
+        changed: applied,
+        previous: {
+          ...(changes.title === undefined ? {} : { title: row.title }),
+          ...(changes.summary === undefined ? {} : { summary: row.summary }),
+          ...(changes.status === undefined ? {} : { status: row.status }),
+          ...(changes.lgaCode === undefined ? {} : { lgaCode: row.lga_code }),
+          ...(changes.wardCode === undefined ? {} : { wardCode: row.ward_code }),
+        },
+      },
+    });
+    return toCase(updated);
+  }
+
+  /**
+   * Add a note to a case.
+   *
+   * Notes were read by the case view and written by nothing, so the record of an
+   * investigator's reasoning had no way in. A note is append-only by intent: it
+   * carries its author and its time, and there is no route that edits or removes
+   * one, because a case file somebody can quietly rewrite is not a case file.
+   */
+  async addNote(
+    actor: AuthenticatedActor,
+    reference: string,
+    body: string,
+    context: RequestContext,
+  ): Promise<{ caseNumber: string; createdAt: string; author: string }> {
+    const row = await this.findByReference(reference);
+    await this.policy.authorize({
+      actor,
+      action: 'CASE_UPDATE',
+      purpose:
+        row?.type === 'MISSING_PERSON' ? 'MISSING_PERSON_INVESTIGATION' : 'CRIMINAL_INVESTIGATION',
+      resource: {
+        type: 'CASE',
+        id: row?.id ?? null,
+        classification: (row?.classification ?? 'LAW_ENFORCEMENT_RESTRICTED') as Classification,
+        subjectPcid: null,
+        lgaCode: row?.lga_code ?? null,
+        linkedCaseIds: row === null ? [] : [row.id],
+      },
+      caseRef: reference,
+      context,
+      auditDetail: { change: 'CASE_NOTE_ADDED' },
+    });
+    if (row === null) throw AppError.notFoundOrNotPermitted(`no case ${reference}`);
+
+    const note = await this.db.queryOne<{ created_at: Date }>(
+      `INSERT INTO case_note (case_id, author_id, body, classification)
+       VALUES ($1, $2, $3, $4) RETURNING created_at`,
+      [row.id, actor.subject.userId, body, row.classification],
+    );
+    if (note === null) throw new Error('case note insert returned no row');
+
+    await this.audit.record({
+      action: 'CASE_UPDATE',
+      outcome: 'PERMITTED',
+      actorType: actor.subject.actorType,
+      actorId: actor.subject.userId,
+      actorDisplay: actor.displayName,
+      agencyId: actor.subject.agencyId,
+      agencyCode: actor.agencyCode,
+      roles: actor.subject.roles,
+      purpose: 'CRIMINAL_INVESTIGATION',
+      resourceType: 'CASE',
+      resourceId: row.id,
+      caseId: row.id,
+      caseNumber: row.case_number,
+      correlationId: context.correlationId,
+      ipAddress: context.ipAddress,
+      // The note's length, not its text: the audit trail records that an access
+      // or a change happened, and is not a second copy of the case file.
+      detail: { change: 'CASE_NOTE_ADDED', characters: body.length },
+    });
+
+    return {
+      caseNumber: row.case_number,
+      createdAt: note.created_at.toISOString(),
+      author: actor.displayName,
+    };
+  }
+
   async close(
     actor: AuthenticatedActor,
     reference: string,

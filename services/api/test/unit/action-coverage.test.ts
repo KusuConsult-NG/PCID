@@ -42,10 +42,6 @@ describe('authorisation coverage', () => {
    * quietly becoming permanent.
    */
   const AWAITING_A_SURFACE: Readonly<Record<string, string>> = Object.freeze({
-    CASE_UPDATE: 'security agency portal',
-    MISSING_PERSON_UPDATE: 'security agency portal',
-    UNIDENTIFIED_PERSON_VIEW: 'security agency portal',
-    UNIDENTIFIED_PERSON_UPDATE: 'security agency portal',
     RELATIONSHIP_VIEW: 'household and relationship records',
     RESPONSE_UNIT_MANAGE: 'emergency response portal',
     IMPORT_RUN: 'bulk registration import',

@@ -286,6 +286,269 @@ export class MissingPersonsService {
     };
   }
 
+  /**
+   * Update a missing-person record as an enquiry develops (§14).
+   *
+   * `MISSING_PERSON_UPDATE` was granted to MISSING_PERSON_OFFICER with no route
+   * behind it, so a case could be reported and never revised: a description
+   * taken at a doorstep in the first hour could not be corrected when somebody
+   * arrived with a photograph, and the record could not move from REPORTED to
+   * ACTIVE.
+   *
+   * Resolving a case is deliberately not here. `LOCATED`, `REUNITED` and
+   * `CLOSED` come from `MISSING_PERSON_RESOLVE`, which demands an outcome note,
+   * because "how did this end" is the question the file exists to answer.
+   */
+  async updateMissingPerson(
+    actor: AuthenticatedActor,
+    reference: string,
+    changes: {
+      status?: 'REPORTED' | 'VERIFIED' | 'ACTIVE' | 'CANCELLED';
+      physicalDescription?: string | null;
+      clothingDescription?: string | null;
+      distinguishingFeatures?: string | null;
+      photographUri?: string | null;
+      circumstances?: string | null;
+      lastSeenAddress?: string | null;
+      lastSeenLgaCode?: string | null;
+      lastSeenWardCode?: string | null;
+      lastSeenAt?: string | null;
+      reporterPhone?: string | null;
+    },
+    context: RequestContext,
+  ): Promise<Record<string, unknown>> {
+    const row = await this.findMissingPerson(reference);
+    const outcome = await this.policy.authorize({
+      actor,
+      action: 'MISSING_PERSON_UPDATE',
+      purpose: 'MISSING_PERSON_INVESTIGATION',
+      resource: {
+        type: 'MISSING_PERSON',
+        id: row?.id ?? null,
+        classification: 'SENSITIVE',
+        subjectPcid: row?.citizen_pcid ?? null,
+        lgaCode: row?.last_seen_lga_code ?? null,
+      },
+      context,
+    });
+    if (row === null) throw AppError.notFoundOrNotPermitted(`no missing person ${reference}`);
+    if (row.resolved_at !== null) {
+      throw AppError.conflict('This case has been resolved. Reopening one is a separate act.');
+    }
+
+    const set: string[] = [];
+    const values: unknown[] = [row.id];
+    const applied: Record<string, unknown> = {};
+    const assign = (column: string, value: unknown, key: string, cast = ''): void => {
+      values.push(value);
+      set.push(`${column} = $${values.length}${cast}`);
+      applied[key] = value;
+    };
+    if (changes.status !== undefined) assign('status', changes.status, 'status');
+    if (changes.physicalDescription !== undefined)
+      assign('physical_description', changes.physicalDescription, 'physicalDescription');
+    if (changes.clothingDescription !== undefined)
+      assign('clothing_description', changes.clothingDescription, 'clothingDescription');
+    if (changes.distinguishingFeatures !== undefined)
+      assign('distinguishing_features', changes.distinguishingFeatures, 'distinguishingFeatures');
+    if (changes.photographUri !== undefined)
+      assign('photograph_uri', changes.photographUri, 'photographUri');
+    if (changes.circumstances !== undefined)
+      assign('circumstances', changes.circumstances, 'circumstances');
+    if (changes.lastSeenAddress !== undefined)
+      assign('last_seen_address', changes.lastSeenAddress, 'lastSeenAddress');
+    if (changes.lastSeenLgaCode !== undefined)
+      assign('last_seen_lga_code', changes.lastSeenLgaCode, 'lastSeenLgaCode');
+    if (changes.lastSeenWardCode !== undefined)
+      assign('last_seen_ward_code', changes.lastSeenWardCode, 'lastSeenWardCode');
+    if (changes.lastSeenAt !== undefined)
+      assign('last_seen_at', changes.lastSeenAt, 'lastSeenAt', '::timestamptz');
+    if (changes.reporterPhone !== undefined)
+      assign('reporter_phone', changes.reporterPhone, 'reporterPhone');
+
+    if (set.length === 0) {
+      throw AppError.validation('Nothing to change.', [
+        { path: 'body', message: 'Supply at least one field to update.' },
+      ]);
+    }
+
+    const updated = await this.db.queryOne<MissingPersonRow>(
+      `UPDATE missing_person SET ${set.join(', ')} WHERE id = $1 RETURNING *`,
+      values,
+    );
+    if (updated === null) throw new Error('missing person update returned no row');
+
+    await this.audit.record({
+      action: 'MISSING_PERSON_UPDATE',
+      outcome: 'PERMITTED',
+      actorType: actor.subject.actorType,
+      actorId: actor.subject.userId,
+      actorDisplay: actor.displayName,
+      agencyId: actor.subject.agencyId,
+      agencyCode: actor.agencyCode,
+      roles: actor.subject.roles,
+      purpose: 'MISSING_PERSON_INVESTIGATION',
+      resourceType: 'MISSING_PERSON',
+      resourceId: row.id,
+      subjectPcid: row.citizen_pcid,
+      correlationId: context.correlationId,
+      ipAddress: context.ipAddress,
+      // Which fields moved, not what they now say: the audit trail records that
+      // a change happened and is not a second copy of the record.
+      detail: { changed: Object.keys(applied), previousStatus: row.status },
+    });
+
+    return toMissingPerson(updated, outcome.decision);
+  }
+
+  /**
+   * Record that somebody thinks they saw the person (§14).
+   *
+   * Sightings were read by the case view and written by nothing, so the main
+   * thing that comes in on a missing-person enquiry had no way in.
+   *
+   * A sighting arrives UNVERIFIED and stays that way until an officer says
+   * otherwise. That is not bureaucracy: an unverified sighting that reads as a
+   * fact sends a search team to the wrong ward, and "discounted" has to be a
+   * recordable outcome or the file only ever grows.
+   */
+  async reportSighting(
+    actor: AuthenticatedActor,
+    reference: string,
+    input: {
+      description: string;
+      sightedAt?: string | null;
+      addressText?: string | null;
+      lgaCode?: string | null;
+      wardCode?: string | null;
+      reporterName?: string | null;
+      reporterPhone?: string | null;
+    },
+    context: RequestContext,
+  ): Promise<{ id: string; caseReference: string; verificationStatus: string }> {
+    const row = await this.findMissingPerson(reference);
+    await this.policy.authorize({
+      actor,
+      action: 'MISSING_PERSON_UPDATE',
+      purpose: 'MISSING_PERSON_INVESTIGATION',
+      resource: {
+        type: 'MISSING_PERSON',
+        id: row?.id ?? null,
+        classification: 'SENSITIVE',
+        subjectPcid: row?.citizen_pcid ?? null,
+        lgaCode: row?.last_seen_lga_code ?? null,
+      },
+      context,
+      auditDetail: { change: 'SIGHTING_REPORTED' },
+    });
+    if (row === null) throw AppError.notFoundOrNotPermitted(`no missing person ${reference}`);
+
+    const sighting = await this.db.queryOne<{ id: string }>(
+      `INSERT INTO sighting (missing_person_id, sighted_at, address_text, lga_code, ward_code,
+                             description, reporter_name, reporter_phone)
+       VALUES ($1,$2::timestamptz,$3,$4,$5,$6,$7,$8) RETURNING id`,
+      [
+        row.id,
+        input.sightedAt ?? null,
+        input.addressText ?? null,
+        input.lgaCode ?? null,
+        input.wardCode ?? null,
+        input.description,
+        input.reporterName ?? null,
+        input.reporterPhone ?? null,
+      ],
+    );
+    if (sighting === null) throw new Error('sighting insert returned no row');
+
+    await this.audit.record({
+      action: 'MISSING_PERSON_UPDATE',
+      outcome: 'PERMITTED',
+      actorType: actor.subject.actorType,
+      actorId: actor.subject.userId,
+      actorDisplay: actor.displayName,
+      agencyId: actor.subject.agencyId,
+      agencyCode: actor.agencyCode,
+      roles: actor.subject.roles,
+      purpose: 'MISSING_PERSON_INVESTIGATION',
+      resourceType: 'MISSING_PERSON',
+      resourceId: row.id,
+      subjectPcid: row.citizen_pcid,
+      correlationId: context.correlationId,
+      ipAddress: context.ipAddress,
+      detail: { change: 'SIGHTING_REPORTED', sightingId: sighting.id, lgaCode: input.lgaCode },
+    });
+
+    return {
+      id: sighting.id,
+      caseReference: row.case_reference,
+      verificationStatus: 'UNVERIFIED',
+    };
+  }
+
+  /** Say whether a reported sighting held up. Discounting one is an outcome. */
+  async reviewSighting(
+    actor: AuthenticatedActor,
+    sightingId: string,
+    verificationStatus: 'VERIFIED' | 'DISCOUNTED',
+    context: RequestContext,
+  ): Promise<{ id: string; verificationStatus: string }> {
+    const existing = await this.db.queryOne<{
+      id: string;
+      missing_person_id: string;
+      verification_status: string;
+      citizen_pcid: string | null;
+      last_seen_lga_code: string | null;
+    }>(
+      `SELECT s.id, s.missing_person_id, s.verification_status,
+              mp.citizen_pcid, mp.last_seen_lga_code
+         FROM sighting s JOIN missing_person mp ON mp.id = s.missing_person_id
+        WHERE s.id = $1`,
+      [sightingId],
+    );
+
+    await this.policy.authorize({
+      actor,
+      action: 'MISSING_PERSON_UPDATE',
+      purpose: 'MISSING_PERSON_INVESTIGATION',
+      resource: {
+        type: 'MISSING_PERSON',
+        id: existing?.missing_person_id ?? null,
+        classification: 'SENSITIVE',
+        subjectPcid: existing?.citizen_pcid ?? null,
+        lgaCode: existing?.last_seen_lga_code ?? null,
+      },
+      context,
+      auditDetail: { change: 'SIGHTING_REVIEWED', verificationStatus },
+    });
+    if (existing === null) throw AppError.notFoundOrNotPermitted(`no sighting ${sightingId}`);
+
+    await this.db.query(
+      `UPDATE sighting SET verification_status = $2, verified_by_user_id = $3, verified_at = now()
+        WHERE id = $1`,
+      [sightingId, verificationStatus, actor.subject.userId],
+    );
+
+    await this.audit.record({
+      action: 'MISSING_PERSON_UPDATE',
+      outcome: 'PERMITTED',
+      actorType: actor.subject.actorType,
+      actorId: actor.subject.userId,
+      actorDisplay: actor.displayName,
+      agencyId: actor.subject.agencyId,
+      agencyCode: actor.agencyCode,
+      roles: actor.subject.roles,
+      purpose: 'MISSING_PERSON_INVESTIGATION',
+      resourceType: 'MISSING_PERSON',
+      resourceId: existing.missing_person_id,
+      subjectPcid: existing.citizen_pcid,
+      correlationId: context.correlationId,
+      ipAddress: context.ipAddress,
+      detail: { change: 'SIGHTING_REVIEWED', sightingId, verificationStatus },
+    });
+
+    return { id: sightingId, verificationStatus };
+  }
+
   async createUnidentifiedPerson(
     actor: AuthenticatedActor,
     input: CreateUnidentifiedPersonInput,
@@ -360,6 +623,226 @@ export class MissingPersonsService {
       },
     });
     return { reference, id: row.id };
+  }
+
+  /**
+   * The register of people found who cannot say who they are (§15).
+   *
+   * `UNIDENTIFIED_PERSON_VIEW` was granted to four roles - investigator,
+   * incident officer, dispatcher, missing-person officer - and performed by no
+   * route, so a record could be created at the roadside and read by nobody. The
+   * whole point of the register is that somebody looking for a missing relative
+   * can be matched against it.
+   *
+   * Projected through the policy decision like any other record, so the
+   * biometric custody reference is released only to a caller holding the
+   * law-enforcement compartment, and nothing here is a biometric itself (§12).
+   */
+  async listUnidentifiedPersons(
+    actor: AuthenticatedActor,
+    filters: { status?: string; lgaCode?: string; limit: number; offset: number },
+    context: RequestContext,
+  ): Promise<{ records: Record<string, unknown>[]; total: number }> {
+    const outcome = await this.policy.authorize({
+      actor,
+      action: 'UNIDENTIFIED_PERSON_VIEW',
+      purpose: 'EMERGENCY_IDENTIFICATION',
+      resource: {
+        type: 'UNIDENTIFIED_PERSON',
+        id: null,
+        classification: 'SENSITIVE',
+        subjectPcid: null,
+        lgaCode: filters.lgaCode ?? null,
+      },
+      context,
+    });
+
+    const where = new WhereBuilder();
+    if (filters.status !== undefined) where.add('status = ?', filters.status);
+    if (filters.lgaCode !== undefined) where.add('found_lga_code = ?', filters.lgaCode);
+
+    const rows = await this.db.query<UnidentifiedPersonRow>(
+      `SELECT * FROM unidentified_person ${where.sql} ORDER BY found_at DESC
+        LIMIT $${where.next()} OFFSET $${where.next(2)}`,
+      where.withExtra(filters.limit, filters.offset),
+    );
+    const total = await this.db.queryOne<{ count: string }>(
+      `SELECT count(*)::text AS count FROM unidentified_person ${where.sql}`,
+      where.params,
+    );
+    return {
+      records: rows.map((row) => toUnidentifiedPerson(row, outcome.decision)),
+      total: Number(total?.count ?? 0),
+    };
+  }
+
+  async viewUnidentifiedPerson(
+    actor: AuthenticatedActor,
+    reference: string,
+    context: RequestContext,
+  ): Promise<Record<string, unknown>> {
+    const row = await this.findUnidentifiedPerson(reference);
+    const outcome = await this.policy.authorize({
+      actor,
+      action: 'UNIDENTIFIED_PERSON_VIEW',
+      purpose: 'EMERGENCY_IDENTIFICATION',
+      resource: {
+        type: 'UNIDENTIFIED_PERSON',
+        id: row?.id ?? null,
+        classification: 'SENSITIVE',
+        subjectPcid: row?.identified_pcid ?? null,
+        lgaCode: row?.found_lga_code ?? null,
+      },
+      context,
+    });
+    if (row === null) throw AppError.notFoundOrNotPermitted(`no unidentified person ${reference}`);
+
+    // Candidates raised against this record, with the reasoning that produced
+    // them. A score never identifies anybody (§13); this is what a person reads
+    // before deciding.
+    const matches = await this.db.query<{
+      id: string;
+      score: string;
+      factors: unknown;
+      status: string;
+      engine_version: string;
+      case_reference: string;
+      full_name: string;
+    }>(
+      `SELECT pm.id, pm.score, pm.factors, pm.status, pm.engine_version,
+              mp.case_reference, mp.full_name
+         FROM person_match pm
+         JOIN missing_person mp ON mp.id = pm.missing_person_id
+        WHERE pm.unidentified_person_id = $1
+        ORDER BY pm.score DESC`,
+      [row.id],
+    );
+
+    return {
+      ...toUnidentifiedPerson(row, outcome.decision),
+      candidateMatches: matches.map((match) => ({
+        id: match.id,
+        missingPersonReference: match.case_reference,
+        missingPersonName: match.full_name,
+        score: Number(match.score),
+        factors: match.factors,
+        status: match.status,
+        engineVersion: match.engine_version,
+        note: 'A candidate, not an identification. A named person decides (§13).',
+      })),
+    };
+  }
+
+  /**
+   * Update an unidentified-person record as more becomes known (§15).
+   *
+   * Identity is deliberately not settable here. `identified_pcid` is written
+   * only by confirming a candidate match, which requires a named human reviewer
+   * and is refused by a database constraint without one. An officer who could
+   * type a PCID into this record would be identifying somebody by assertion.
+   */
+  async updateUnidentifiedPerson(
+    actor: AuthenticatedActor,
+    reference: string,
+    changes: {
+      status?: 'UNIDENTIFIED' | 'UNDER_REVIEW' | 'CLOSED';
+      condition?: 'CONSCIOUS' | 'UNCONSCIOUS' | 'INJURED' | 'DECEASED' | 'UNKNOWN';
+      estimatedAgeMin?: number | null;
+      estimatedAgeMax?: number | null;
+      apparentSex?: 'FEMALE' | 'MALE' | 'UNSPECIFIED' | null;
+      physicalDescription?: string | null;
+      clothingDescription?: string | null;
+      distinguishingFeatures?: string | null;
+      identityClues?: string | null;
+      photographUri?: string | null;
+    },
+    context: RequestContext,
+  ): Promise<Record<string, unknown>> {
+    const row = await this.findUnidentifiedPerson(reference);
+    const outcome = await this.policy.authorize({
+      actor,
+      action: 'UNIDENTIFIED_PERSON_UPDATE',
+      purpose: 'EMERGENCY_IDENTIFICATION',
+      resource: {
+        type: 'UNIDENTIFIED_PERSON',
+        id: row?.id ?? null,
+        classification: 'SENSITIVE',
+        subjectPcid: row?.identified_pcid ?? null,
+        lgaCode: row?.found_lga_code ?? null,
+      },
+      context,
+    });
+    if (row === null) throw AppError.notFoundOrNotPermitted(`no unidentified person ${reference}`);
+    if (row.status === 'IDENTIFIED' || row.status === 'PROVISIONALLY_IDENTIFIED') {
+      throw AppError.conflict(
+        'This record has been matched to a person. Change it by reviewing the match.',
+      );
+    }
+
+    const set: string[] = [];
+    const values: unknown[] = [row.id];
+    const applied: string[] = [];
+    const assign = (column: string, value: unknown, key: string): void => {
+      values.push(value);
+      set.push(`${column} = $${values.length}`);
+      applied.push(key);
+    };
+    if (changes.status !== undefined) assign('status', changes.status, 'status');
+    if (changes.condition !== undefined) assign('condition', changes.condition, 'condition');
+    if (changes.estimatedAgeMin !== undefined)
+      assign('estimated_age_min', changes.estimatedAgeMin, 'estimatedAgeMin');
+    if (changes.estimatedAgeMax !== undefined)
+      assign('estimated_age_max', changes.estimatedAgeMax, 'estimatedAgeMax');
+    if (changes.apparentSex !== undefined)
+      assign('apparent_sex', changes.apparentSex, 'apparentSex');
+    if (changes.physicalDescription !== undefined)
+      assign('physical_description', changes.physicalDescription, 'physicalDescription');
+    if (changes.clothingDescription !== undefined)
+      assign('clothing_description', changes.clothingDescription, 'clothingDescription');
+    if (changes.distinguishingFeatures !== undefined)
+      assign('distinguishing_features', changes.distinguishingFeatures, 'distinguishingFeatures');
+    if (changes.identityClues !== undefined)
+      assign('identity_clues', changes.identityClues, 'identityClues');
+    if (changes.photographUri !== undefined)
+      assign('photograph_uri', changes.photographUri, 'photographUri');
+
+    if (set.length === 0) {
+      throw AppError.validation('Nothing to change.', [
+        { path: 'body', message: 'Supply at least one field to update.' },
+      ]);
+    }
+
+    const updated = await this.db.queryOne<UnidentifiedPersonRow>(
+      `UPDATE unidentified_person SET ${set.join(', ')} WHERE id = $1 RETURNING *`,
+      values,
+    );
+    if (updated === null) throw new Error('unidentified person update returned no row');
+
+    await this.audit.record({
+      action: 'UNIDENTIFIED_PERSON_UPDATE',
+      outcome: 'PERMITTED',
+      actorType: actor.subject.actorType,
+      actorId: actor.subject.userId,
+      actorDisplay: actor.displayName,
+      agencyId: actor.subject.agencyId,
+      agencyCode: actor.agencyCode,
+      roles: actor.subject.roles,
+      purpose: 'EMERGENCY_IDENTIFICATION',
+      resourceType: 'UNIDENTIFIED_PERSON',
+      resourceId: row.id,
+      correlationId: context.correlationId,
+      ipAddress: context.ipAddress,
+      detail: { changed: applied, previousStatus: row.status },
+    });
+
+    return toUnidentifiedPerson(updated, outcome.decision);
+  }
+
+  async findUnidentifiedPerson(reference: string): Promise<UnidentifiedPersonRow | null> {
+    return this.db.queryOne<UnidentifiedPersonRow>(
+      'SELECT * FROM unidentified_person WHERE reference = $1 OR id::text = $1',
+      [reference],
+    );
   }
 
   /** Run the matching engine and persist the candidates it produces. */
@@ -644,6 +1127,32 @@ export interface MissingPersonRow {
   resolution_note: string | null;
 }
 
+export interface UnidentifiedPersonRow {
+  id: string;
+  reference: string;
+  incident_id: string | null;
+  condition: string;
+  status: string;
+  estimated_age_min: number | null;
+  estimated_age_max: number | null;
+  apparent_sex: string | null;
+  photograph_uri: string | null;
+  physical_description: string | null;
+  clothing_description: string | null;
+  distinguishing_features: string | null;
+  identity_clues: string | null;
+  found_address: string | null;
+  found_lga_code: string | null;
+  found_ward_code: string | null;
+  found_at: Date;
+  external_biometric_reference: string | null;
+  biometric_custodian_agency_id: string | null;
+  agency_id: string | null;
+  identified_pcid: string | null;
+  identified_at: Date | null;
+  created_at: Date;
+}
+
 /**
  * Map a stored missing-person row onto catalogue field paths, so the response is
  * projected through the policy decision like every other record (§27).
@@ -676,6 +1185,52 @@ function missingPersonFieldValues(row: MissingPersonRow): Record<string, unknown
       resolvedAt: row.resolved_at?.toISOString() ?? null,
       note: row.resolution_note,
     },
+  };
+}
+
+function unidentifiedPersonFieldValues(row: UnidentifiedPersonRow): Record<string, unknown> {
+  return {
+    'unidentifiedPerson.reference': row.reference,
+    'unidentifiedPerson.status': row.status,
+    'unidentifiedPerson.condition': row.condition,
+    'unidentifiedPerson.estimatedAgeRange':
+      row.estimated_age_min === null && row.estimated_age_max === null
+        ? null
+        : { min: row.estimated_age_min, max: row.estimated_age_max },
+    'unidentifiedPerson.apparentSex': row.apparent_sex,
+    'unidentifiedPerson.photographUri': row.photograph_uri,
+    'unidentifiedPerson.physicalDescription': row.physical_description,
+    'unidentifiedPerson.clothingDescription': row.clothing_description,
+    'unidentifiedPerson.distinguishingFeatures': row.distinguishing_features,
+    'unidentifiedPerson.identityClues': row.identity_clues,
+    'unidentifiedPerson.found': {
+      address: row.found_address,
+      lgaCode: row.found_lga_code,
+      wardCode: row.found_ward_code,
+      at: row.found_at.toISOString(),
+    },
+    // A reference to material another agency holds, never material itself: the
+    // platform stores no biometrics and matches none (§12).
+    'unidentifiedPerson.biometricCustody':
+      row.external_biometric_reference === null
+        ? null
+        : {
+            reference: row.external_biometric_reference,
+            custodianAgencyId: row.biometric_custodian_agency_id,
+          },
+    'unidentifiedPerson.identifiedPcid': row.identified_pcid,
+  };
+}
+
+function toUnidentifiedPerson(
+  row: UnidentifiedPersonRow,
+  decision: PolicyDecision,
+): Record<string, unknown> {
+  return {
+    id: row.id,
+    foundAt: row.found_at.toISOString(),
+    ...project(decision, unidentifiedPersonFieldValues(row)),
+    restrictedFields: withheld(decision),
   };
 }
 

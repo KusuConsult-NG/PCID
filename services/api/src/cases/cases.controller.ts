@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import type { CaseStatus, CaseType } from '@pcid/contracts';
 import type { Request } from 'express';
 
@@ -8,6 +8,8 @@ import {
   caseCloseSchema,
   caseLinkSubjectSchema,
   caseListSchema,
+  caseNoteSchema,
+  caseUpdateSchema,
   createCaseSchema,
 } from '../common/dto';
 import { documentRoute } from '../common/openapi/registry';
@@ -48,6 +50,31 @@ documentRoute({
     { name: 'reference', in: 'path', description: 'Case number, e.g. CASE-2026-00928.' },
   ],
   actions: ['CASE_VIEW'],
+});
+documentRoute({
+  method: 'patch',
+  path: '/api/v1/cases/:reference',
+  tag: 'Cases',
+  summary: 'Correct or advance a case',
+  description:
+    'Title, summary, status and geography. It cannot close a case - that is a separate entitlement ' +
+    'and demands a closure note - and it cannot change the classification or the owning agency, ' +
+    'because those decide who may reach the case at all.',
+  parameters: [{ name: 'reference', in: 'path', description: 'Case number.' }],
+  body: caseUpdateSchema,
+  actions: ['CASE_UPDATE'],
+});
+documentRoute({
+  method: 'post',
+  path: '/api/v1/cases/:reference/notes',
+  tag: 'Cases',
+  summary: 'Add a note to the case file',
+  description:
+    'Append-only by intent: a note carries its author and its time, and no route edits or removes ' +
+    'one. A case file somebody can quietly rewrite is not a case file.',
+  parameters: [{ name: 'reference', in: 'path', description: 'Case number.' }],
+  body: caseNoteSchema,
+  actions: ['CASE_UPDATE'],
 });
 documentRoute({
   method: 'post',
@@ -121,6 +148,39 @@ export class CasesController {
     @Req() request: Request,
   ): Promise<unknown> {
     return this.cases.view(actor, reference, contextOf(request));
+  }
+
+  @Patch(':reference')
+  async update(
+    @Actor() actor: AuthenticatedActor,
+    @Param('reference') reference: string,
+    @Body() body: unknown,
+    @Req() request: Request,
+  ): Promise<unknown> {
+    const input = validate(caseUpdateSchema, body);
+    return this.cases.update(
+      actor,
+      reference,
+      {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.summary !== undefined ? { summary: input.summary } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.lgaCode !== undefined ? { lgaCode: input.lgaCode } : {}),
+        ...(input.wardCode !== undefined ? { wardCode: input.wardCode } : {}),
+      },
+      contextOf(request),
+    );
+  }
+
+  @Post(':reference/notes')
+  async addNote(
+    @Actor() actor: AuthenticatedActor,
+    @Param('reference') reference: string,
+    @Body() body: unknown,
+    @Req() request: Request,
+  ): Promise<unknown> {
+    const input = validate(caseNoteSchema, body);
+    return this.cases.addNote(actor, reference, input.body, contextOf(request));
   }
 
   @Post(':reference/subjects')

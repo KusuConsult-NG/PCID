@@ -258,6 +258,83 @@ export const breakGlassReviewSchema = z.object({
   note: z.string().min(5).max(2000),
 });
 
+/* --- Security agency work: cases, missing and unidentified persons -------- */
+
+export const caseUpdateSchema = z
+  .object({
+    title: z.string().min(3).max(200).optional(),
+    summary: z.string().max(4000).nullish(),
+    // Closing a case is CASE_CLOSE and demands a closure note; it is not here.
+    status: z.enum(['DRAFT', 'OPEN', 'ACTIVE', 'SUSPENDED', 'PENDING_REVIEW']).optional(),
+    lgaCode: z.string().max(16).nullish(),
+    wardCode: z.string().max(24).nullish(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'Supply at least one field to update.',
+  });
+
+export const caseNoteSchema = z.object({ body: z.string().min(3).max(8000) });
+
+export const missingPersonUpdateSchema = z
+  .object({
+    // LOCATED, REUNITED and CLOSED come from MISSING_PERSON_RESOLVE, which
+    // demands an outcome note.
+    status: z.enum(['REPORTED', 'VERIFIED', 'ACTIVE', 'CANCELLED']).optional(),
+    physicalDescription: z.string().max(2000).nullish(),
+    clothingDescription: z.string().max(2000).nullish(),
+    distinguishingFeatures: z.string().max(2000).nullish(),
+    photographUri: z.string().max(500).nullish(),
+    circumstances: z.string().max(4000).nullish(),
+    lastSeenAddress: z.string().max(400).nullish(),
+    lastSeenLgaCode: z.string().max(16).nullish(),
+    lastSeenWardCode: z.string().max(24).nullish(),
+    lastSeenAt: z.string().datetime().nullish(),
+    reporterPhone: z.string().max(24).nullish(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'Supply at least one field to update.',
+  });
+
+export const sightingSchema = z.object({
+  description: z.string().min(5).max(2000),
+  sightedAt: z.string().datetime().nullish(),
+  addressText: z.string().max(400).nullish(),
+  lgaCode: z.string().max(16).nullish(),
+  wardCode: z.string().max(24).nullish(),
+  reporterName: z.string().max(200).nullish(),
+  reporterPhone: z.string().max(24).nullish(),
+});
+
+export const sightingReviewSchema = z.object({
+  verificationStatus: z.enum(['VERIFIED', 'DISCOUNTED']),
+});
+
+export const unidentifiedPersonQuerySchema = paginationSchema.extend({
+  status: z
+    .enum(['UNIDENTIFIED', 'UNDER_REVIEW', 'PROVISIONALLY_IDENTIFIED', 'IDENTIFIED', 'CLOSED'])
+    .optional(),
+  lgaCode: z.string().max(16).optional(),
+});
+
+export const unidentifiedPersonUpdateSchema = z
+  .object({
+    // Identity is never set here: it comes from confirming a candidate match,
+    // which a database constraint refuses without a named human reviewer (§13).
+    status: z.enum(['UNIDENTIFIED', 'UNDER_REVIEW', 'CLOSED']).optional(),
+    condition: z.enum(['CONSCIOUS', 'UNCONSCIOUS', 'INJURED', 'DECEASED', 'UNKNOWN']).optional(),
+    estimatedAgeMin: z.coerce.number().int().min(0).max(130).nullish(),
+    estimatedAgeMax: z.coerce.number().int().min(0).max(130).nullish(),
+    apparentSex: z.enum(['FEMALE', 'MALE', 'UNSPECIFIED']).nullish(),
+    physicalDescription: z.string().max(2000).nullish(),
+    clothingDescription: z.string().max(2000).nullish(),
+    distinguishingFeatures: z.string().max(2000).nullish(),
+    identityClues: z.string().max(2000).nullish(),
+    photographUri: z.string().max(500).nullish(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'Supply at least one field to update.',
+  });
+
 /* --- Oversight: correction review and alert review (§7, §32, §66) --------- */
 
 export const correctionQueueSchema = paginationSchema.extend({
