@@ -4,6 +4,7 @@ import type { DispatchStatus, ResponseUnitStatus } from '@pcid/contracts';
 import { AuditService } from '../audit/audit.service';
 import { AppError } from '../common/errors';
 import type { RequestContext } from '../common/correlation';
+import { boxAround } from '../common/geography';
 import { WhereBuilder } from '../common/sql';
 import { Database } from '../database/pool';
 import type { AuthenticatedActor } from '../iam/actor';
@@ -25,6 +26,15 @@ export interface ResponseUnitRow {
   contact_phone: string | null;
   distance_metres?: string | null;
 }
+
+/**
+ * How far out to look for a unit before giving up on the index.
+ *
+ * 150km covers Plateau State corner to corner with room to spare, so in practice
+ * the box never excludes a unit that could realistically attend - and it is
+ * small enough that the planner can use it.
+ */
+const NEAREST_UNIT_SEARCH_METRES = 150_000;
 
 const DISPATCH_TRANSITIONS: Readonly<Record<DispatchStatus, readonly DispatchStatus[]>> =
   Object.freeze({
@@ -102,37 +112,76 @@ export class DispatchService {
       context,
     });
 
-    const where = new WhereBuilder();
-    if (filters.status !== undefined) where.add('ru.status = ?', filters.status);
-    if (filters.agencyId !== undefined) where.add('ru.agency_id = ?', filters.agencyId);
-    if (filters.lgaCode !== undefined) where.add('ru.home_lga_code = ?', filters.lgaCode);
+    const base = (): WhereBuilder => {
+      const builder = new WhereBuilder();
+      if (filters.status !== undefined) builder.add('ru.status = ?', filters.status);
+      if (filters.agencyId !== undefined) builder.add('ru.agency_id = ?', filters.agencyId);
+      if (filters.lgaCode !== undefined) builder.add('ru.home_lga_code = ?', filters.lgaCode);
+      return builder;
+    };
 
     if (filters.nearIncident !== undefined) {
       const incident = await this.incidents.findByReference(filters.nearIncident);
       if (incident?.latitude != null && incident.longitude != null) {
-        // Only units that could actually be sent, ordered by how far away they are.
-        where.add('ru.status = ?', 'AVAILABLE');
-        const latIndex = where.next();
-        const lonIndex = where.next(2);
-        const rows = await this.db.query<ResponseUnitRow>(
-          `SELECT ru.*,
-                  great_circle_metres(ru.latitude, ru.longitude, $${latIndex}::numeric, $${lonIndex}::numeric)
-                    AS distance_metres
-             FROM response_unit ru
-             ${where.sql}
-            ORDER BY distance_metres ASC NULLS LAST, ru.unit_code
-            LIMIT 25`,
-          where.withExtra(incident.latitude, incident.longitude),
-        );
-        return rows.map(toUnit);
+        const centre = {
+          latitude: Number(incident.latitude),
+          longitude: Number(incident.longitude),
+        };
+        // Bounded first, then measured. Without the box the query computes a
+        // great-circle distance for every unit in the state and sorts the
+        // result, which is a sequential scan; with it the planner can use the
+        // position index and the distance is computed only for the units that
+        // could plausibly win. The box is generous on purpose - it is a filter,
+        // and the sort is what decides the answer.
+        const nearby = await this.nearest(base(), centre, NEAREST_UNIT_SEARCH_METRES);
+        if (nearby.length > 0) return nearby.map(toUnit);
+
+        // Nothing within the box. Measure the whole fleet rather than telling a
+        // control room there is nothing to send: a slow answer beats a wrong one
+        // when somebody is waiting for an ambulance.
+        const anywhere = await this.nearest(base(), centre, null);
+        return anywhere.map(toUnit);
       }
     }
 
+    const where = base();
     const rows = await this.db.query<ResponseUnitRow>(
       `SELECT ru.* FROM response_unit ru ${where.sql} ORDER BY ru.unit_code LIMIT 200`,
       where.params,
     );
     return rows.map(toUnit);
+  }
+
+  /**
+   * Units that could be sent, nearest first.
+   *
+   * `radiusMetres` bounds the search so the position index is usable; `null`
+   * measures the whole fleet, which is the fallback when nothing is near enough
+   * for the box to find.
+   */
+  private async nearest(
+    where: WhereBuilder,
+    centre: { latitude: number; longitude: number },
+    radiusMetres: number | null,
+  ): Promise<ResponseUnitRow[]> {
+    where.add('ru.status = ?', 'AVAILABLE');
+    if (radiusMetres !== null) {
+      const box = boxAround(centre, radiusMetres);
+      where.add('ru.latitude BETWEEN ? AND ?', box.south, box.north);
+      where.add('ru.longitude BETWEEN ? AND ?', box.west, box.east);
+    }
+    const latIndex = where.next();
+    const lonIndex = where.next(2);
+    return this.db.query<ResponseUnitRow>(
+      `SELECT ru.*,
+              great_circle_metres(ru.latitude, ru.longitude, $${latIndex}::numeric, $${lonIndex}::numeric)
+                AS distance_metres
+         FROM response_unit ru
+         ${where.sql}
+        ORDER BY distance_metres ASC NULLS LAST, ru.unit_code
+        LIMIT 25`,
+      where.withExtra(centre.latitude, centre.longitude),
+    );
   }
 
   /**

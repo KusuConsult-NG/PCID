@@ -229,6 +229,42 @@ happened, which units went, and how long each step took. A service that could no
 read back a job it attended could not debrief it, answer a complaint about it, or
 check the response times it is measured on.
 
+## The map
+
+`GET /api/v1/map/situation` — and the **Map** page in the portal — is the
+command picture: the live incidents that have a coordinate, and the units that
+have reported one.
+
+```http
+GET /api/v1/map/situation
+GET /api/v1/map/situation?north=9.95&south=9.90&east=8.92&west=8.85
+```
+
+Give all four corners of a view or none. With none it opens on everything that
+is happening, with a little air around it.
+
+Three things to know before you use it to send anybody anywhere.
+
+**A call taken by address is not on the map.** It is in `withoutPosition`,
+listed beside the picture, because placing it would mean choosing a point and a
+point somebody chose is a point a crew drives to. If you need it on the map, get
+a coordinate.
+
+**Every pin says how its coordinate was obtained.** "Reported from the scene" is
+a responder who stood there. "Given by the caller" is somebody frightened
+describing where they think they are. "From a registered address" is not the
+scene at all. The portal prints the sentence next to each position.
+
+**There is no background map, and there will not be one.** Every tile a browser
+fetched would tell a tile company which rectangle of Plateau State this control
+room is watching, several times a minute. What is drawn instead is the
+positions, a graticule and a scale bar. Use the scale bar: without it two pins a
+centimetre apart could be two streets or two local governments.
+
+Layers are authorised separately. An account that may see the fleet and not
+incidents gets the fleet, and is told which layers it holds rather than shown an
+empty picture.
+
 ## What control sees
 
 ```http

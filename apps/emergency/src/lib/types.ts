@@ -137,3 +137,52 @@ export interface UnidentifiedPerson {
   readonly foundAt: string;
   readonly restrictedFields: readonly string[];
 }
+
+/** A point on the command picture, and how its coordinate was obtained. */
+export interface Pin {
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly source: string | null;
+  readonly reportedAt?: string | null;
+}
+
+export interface SituationView {
+  readonly extent: {
+    readonly north: number;
+    readonly south: number;
+    readonly east: number;
+    readonly west: number;
+  } | null;
+  readonly incidents: readonly {
+    readonly incidentNumber: string;
+    readonly type: string;
+    readonly severity: string;
+    readonly status: string;
+    readonly description: string;
+    readonly address: string | null;
+    readonly lgaCode: string | null;
+    readonly position: Pin;
+    readonly reportedAt: string;
+    readonly unitsSent: number;
+    readonly awaitingDispatch: boolean;
+  }[];
+  readonly units: readonly {
+    readonly unitCode: string;
+    readonly type: string;
+    readonly status: string;
+    readonly homeLgaCode: string | null;
+    readonly position: Pin;
+  }[];
+  /** Live incidents with no coordinate. A map must not invent one for them. */
+  readonly withoutPosition: readonly {
+    readonly incidentNumber: string;
+    readonly severity: string;
+    readonly status: string;
+    readonly description: string;
+    readonly address: string | null;
+    readonly lgaCode: string | null;
+    readonly reportedAt: string;
+    readonly reason: string;
+  }[];
+  readonly layers: readonly string[];
+}

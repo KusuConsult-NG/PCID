@@ -56,7 +56,7 @@ export default defineConfig({
     {
       name: 'control',
       dependencies: ['fleet'],
-      testMatch: /control\.spec\.ts/,
+      testMatch: /(control|map)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], storageState: STATE_FILES.DISPATCHER },
     },
     {

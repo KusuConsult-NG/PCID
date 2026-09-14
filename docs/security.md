@@ -209,6 +209,29 @@ Two exceptions are deliberate and each has a test:
   authorised are a separate read and stay refused — that is the access closing
   was meant to end.
 
+## A side channel that is not in the audit trail
+
+The command map has no basemap, and that is a security decision rather than an
+aesthetic one.
+
+A conventional web map fetches a few hundred images a minute from a third party,
+each named after a rectangle of the world. Over a shift in a control room that
+is a continuous description of which parts of Plateau State somebody is
+watching, correlatable with the times of day when something is happening,
+delivered to a company under no obligation to anybody here — and it never
+touches the platform, so it appears in no audit record and no oversight review
+would ever find it.
+
+The portal's content-security policy forbids every external origin, so the
+browser could not fetch a tile if the page asked for one. The map is drawn on
+the server as inline SVG from data the platform already holds, and
+`apps/emergency/e2e/map.spec.ts` asserts that the page makes no request off the
+host at all.
+
+The same reasoning is why there is no analytics script, no font CDN and no error
+reporter in any of the four portals. A request to somewhere else is a disclosure
+that the audit trail cannot see.
+
 ## What leaves the platform
 
 A notification is the one thing the platform sends to somebody rather than

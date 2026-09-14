@@ -239,3 +239,111 @@
   padding-inline: 1.25rem;
   font-size: var(--step-1);
 }
+
+/*
+ * The command picture.
+ *
+ * An inline SVG, drawn on the server, with no client JavaScript and no external
+ * request of any kind. There is no basemap and there will not be one from a tile
+ * provider: every tile a browser fetched would tell that provider which
+ * rectangle of the state a control room is looking at.
+ *
+ * Shapes carry the meaning as well as colour — a circle is an incident and a
+ * square is a unit — because a control room screen is read at a distance and
+ * some of the people reading it cannot tell red from amber.
+ */
+.plot {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.plot svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.plot-ground {
+  fill: var(--surface-sunken);
+}
+
+.plot-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 4 6;
+}
+
+.plot-incident circle {
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.plot-incident text,
+.plot-unit text {
+  font-size: 20px;
+  font-weight: 600;
+  fill: var(--ink);
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 4px;
+}
+
+.plot-critical circle {
+  fill: var(--danger);
+}
+
+.plot-high circle {
+  fill: var(--warning);
+}
+
+.plot-medium circle {
+  fill: var(--info);
+}
+
+.plot-low circle {
+  fill: var(--ink-faint);
+}
+
+/* An incident with nothing sent to it. The halo is what a controller looks for. */
+.plot-halo {
+  fill: none;
+  stroke: var(--danger);
+  stroke-width: 2;
+  stroke-dasharray: 5 5;
+}
+
+.plot-unit rect {
+  fill: var(--ok);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.plot-unit-dispatched rect,
+.plot-unit-en_route rect {
+  fill: var(--warning);
+}
+
+.plot-unit-on_scene rect {
+  fill: var(--info);
+}
+
+.plot-unit-offline rect,
+.plot-unit-busy rect {
+  fill: var(--ink-faint);
+}
+
+.plot-scale line {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.plot-scale text {
+  font-size: 20px;
+  font-weight: 600;
+  fill: var(--ink);
+  paint-order: stroke;
+  stroke: var(--surface-sunken);
+  stroke-width: 4px;
+}

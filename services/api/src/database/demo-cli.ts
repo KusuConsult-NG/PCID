@@ -419,6 +419,16 @@ async function main(): Promise<void> {
         reporterContact: '08035550002',
       },
     );
+    // The crew books on and says where they are, which is the only live position
+    // the platform holds and what the command map draws units from.
+    for (const [unitCode, position] of [
+      ['AMB-JOS-01', { latitude: 9.9165, longitude: 8.8783 }],
+      ['AMB-JOS-02', { latitude: 9.8802, longitude: 8.9012 }],
+      ['FIRE-JOS-01', { latitude: 9.9301, longitude: 8.8451 }],
+    ] as const) {
+      await api.post(dispatcherToken, `/api/v1/response-units/${unitCode}/position`, position);
+    }
+
     await api.post(dispatcherToken, `/api/v1/incidents/${incident.incidentNumber}/dispatch`, {
       unitCode: 'AMB-JOS-01',
       note: 'Nearest available ambulance.',

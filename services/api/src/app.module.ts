@@ -38,6 +38,7 @@ import { HttpExceptionFilter } from './common/http-exception.filter';
 import { IncidentsService } from './emergency/incidents.service';
 import { IntegrationController } from './integration/integration.controller';
 import { IntegrationService } from './integration/integration.service';
+import { MapService } from './emergency/map.service';
 import { MatchingEngine } from './missing-persons/matching.engine';
 import { AlertsService } from './oversight/alerts.service';
 import { CorrectionsService } from './oversight/corrections.service';
@@ -100,6 +101,7 @@ import { SecurityModule } from './security/security.module';
     AssetsService,
     IncidentsService,
     DispatchService,
+    MapService,
     CasesService,
     MatchingEngine,
     MissingPersonsService,

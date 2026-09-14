@@ -6,7 +6,9 @@
     "dev": "next dev -p 3400",
     "build": "next build && node scripts/collect-standalone.mjs",
     "start": "PORT=${PORT:-3400} node .next/standalone/apps/emergency/server.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.e2e.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.e2e.json --noEmit && tsc -p tsconfig.unit.json --noEmit",
+    "test": "npm run test:unit",
+    "test:unit": "node --import tsx --test \"test/**/*.test.ts\"",
     "test:e2e": "playwright test"
   },
   "dependencies": {

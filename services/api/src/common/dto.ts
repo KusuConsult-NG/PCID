@@ -199,6 +199,32 @@ export const updateResponseUnitSchema = z
     message: 'Supply at least one field to update.',
   });
 
+/* --- The command map ------------------------------------------------------ */
+
+/**
+ * A map viewport.
+ *
+ * All four corners or none: half a box is not a view, and silently defaulting
+ * the missing side would show somebody a picture they did not ask for and
+ * believe they had bounded.
+ */
+export const situationSchema = z
+  .object({
+    north: z.coerce.number().min(-90).max(90).optional(),
+    south: z.coerce.number().min(-90).max(90).optional(),
+    east: z.coerce.number().min(-180).max(180).optional(),
+    west: z.coerce.number().min(-180).max(180).optional(),
+  })
+  .refine(
+    (value) => {
+      const given = [value.north, value.south, value.east, value.west].filter(
+        (corner) => corner !== undefined,
+      ).length;
+      return given === 0 || given === 4;
+    },
+    { message: 'Give all four corners of the view, or none.' },
+  );
+
 /* --- Notification delivery ------------------------------------------------ */
 
 export const notificationQueueSchema = z.object({

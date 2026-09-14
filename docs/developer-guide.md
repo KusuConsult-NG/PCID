@@ -271,6 +271,28 @@ signed agreement; is the authenticator confirmed; does a role grant the action; 
 the purpose one that action allows; is the field catalogued for that purpose; is
 there a case or incident and is the account on it.
 
+## Drawing something on the command map
+
+`apps/emergency/src/lib/plot.ts` is the projection, the scale bar and the
+sentence about how much a coordinate should be trusted. It is pure, it is unit
+tested without a DOM (`npm run test:unit --workspace @pcid/emergency-portal`),
+and the page that uses it is a server component with no client JavaScript.
+
+Two rules it exists to keep:
+
+- **Never place something the platform did not measure.** If a record has no
+  coordinate it goes in the list beside the picture, not at the centre of its
+  local government. `SituationView.withoutPosition` is that list, and it carries
+  a reason.
+- **Never fetch anything.** No tile provider, no font, no sprite sheet. The
+  content-security policy forbids it and an end-to-end test asserts the page
+  makes no external request; if you find yourself wanting a basemap, read
+  [Security](security.md#a-side-channel-that-is-not-in-the-audit-trail) first.
+
+If you add a spatial query, bound it with `boxAround` or a caller-supplied
+bounding box before computing any distance. `services/api/src/common/geography.ts`
+has the arithmetic and the reasoning; the indexes it depends on are in migration 0013.
+
 ## Sending somebody a notification
 
 Never write to the `notification` table. Call the service:

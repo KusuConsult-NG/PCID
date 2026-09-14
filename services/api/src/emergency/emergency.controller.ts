@@ -12,6 +12,7 @@ import {
   incidentOfficerSchema,
   incidentPersonSchema,
   incidentStatusSchema,
+  situationSchema,
   unitListSchema,
   unitPositionSchema,
   updateResponseUnitSchema,
@@ -21,6 +22,7 @@ import { validate } from '../common/zod-validation.pipe';
 import { Actor } from '../iam/actor';
 import type { AuthenticatedActor } from '../iam/actor';
 import { DispatchService } from './dispatch.service';
+import { MapService } from './map.service';
 import { IncidentsService } from './incidents.service';
 import type { CreateIncidentInput } from './incidents.service';
 
@@ -169,12 +171,51 @@ documentRoute({
   actions: ['DISPATCH_UPDATE'],
 });
 
+documentRoute({
+  method: 'get',
+  path: '/api/v1/map/situation',
+  tag: 'Emergency',
+  summary: 'The command picture: live incidents and units inside a view',
+  description:
+    'Plots only what somebody actually reported. An incident called in by address has no ' +
+    'coordinate and is returned in `withoutPosition` rather than placed at a guessed point — a ' +
+    'map that invented one would send a unit to the pin. Every coordinate carries the provenance ' +
+    'of how it was obtained. There is no citizen layer: the only live positions the platform ' +
+    'holds are units’, reported by the unit about itself (§16). Layers are authorised separately, ' +
+    'and the response says which ones it contains.',
+  parameters: [
+    { name: 'north', in: 'query', description: 'Northern edge of the view. All four or none.' },
+    { name: 'south', in: 'query', description: 'Southern edge of the view.' },
+    { name: 'east', in: 'query', description: 'Eastern edge of the view.' },
+    { name: 'west', in: 'query', description: 'Western edge of the view.' },
+  ],
+  actions: ['INCIDENT_VIEW', 'RESPONSE_UNIT_VIEW'],
+});
+
 @Controller('api/v1')
 export class EmergencyController {
   constructor(
     private readonly incidents: IncidentsService,
     private readonly dispatch: DispatchService,
+    private readonly map: MapService,
   ) {}
+
+  @Get('map/situation')
+  async situation(
+    @Actor() actor: AuthenticatedActor,
+    @Query() query: unknown,
+    @Req() request: Request,
+  ): Promise<unknown> {
+    const input = validate(situationSchema, query);
+    const box =
+      input.north === undefined ||
+      input.south === undefined ||
+      input.east === undefined ||
+      input.west === undefined
+        ? null
+        : { north: input.north, south: input.south, east: input.east, west: input.west };
+    return this.map.situation(actor, box, contextOf(request));
+  }
 
   @Post('incidents')
   async create(

@@ -26,12 +26,13 @@ supplied one, and is never required to obtain a PCID.
 | Integration framework and linked-record projections           | Complete (sandbox and production adapters) |
 | Public-safety analytics with small-number suppression         | Complete                                   |
 | Notification delivery: templates, worker, retry, operations   | Complete                                   |
+| GIS command map: bounded spatial queries, the command picture | Complete                                   |
 | Citizen portal (`apps/portal`)                                | Complete                                   |
 | Government portal (`apps/government`)                         | Complete                                   |
 | Security agency portal (`apps/security`)                      | Complete                                   |
 | Emergency response portal (`apps/emergency`)                  | Complete                                   |
 | Oversight: duplicate, correction and alert queues             | Complete                                   |
-| Mobile applications; GIS command map                          | Not started — see [Roadmap](#roadmap)      |
+| Mobile applications                                           | Not started — see [Roadmap](#roadmap)      |
 
 Five things run: the REST API, documented in OpenAPI at `/api/v1/docs` (and
 written to `docs/openapi.json` by `npm run openapi`), and four portals — for
@@ -186,7 +187,13 @@ These are absences by design, and each is held by a test:
 
 - **No citizen location tracking.** The only live positions held are those of
   response units, reported by the units themselves. Every stored coordinate
-  records how it was obtained; there is no code path that observes a person.
+  records how it was obtained; there is no code path that observes a person. The
+  command map has no layer that could show one, and no function in it takes a
+  person.
+- **No map tile leaves the browser.** The command map draws from the platform's
+  own data and fetches nothing from anywhere: a tile provider receiving the
+  rectangle a control room is looking at, several times a minute, would be
+  receiving a description of where the state's emergencies are.
 - **No bulk export.** No role in the platform grants an export action.
 - **No personal information in an outbound message.** An SMS or an email from
   the platform carries a notice — "there is something waiting for you" — and
@@ -226,15 +233,15 @@ These are absences by design, and each is held by a test:
 Delivered: platform foundation, authentication and authorisation, MDA
 administration, the PCID and citizen registry, the citizen portal, the
 government portal and its oversight queues, the security agency portal, the
-emergency response portal, the data exchange and integration framework, asset
-registry integration, emergency response, security and case management, missing
-and unidentified persons, and analytics.
+emergency response portal and its command map, the data exchange and integration
+framework, asset registry integration, emergency response, security and case
+management, missing and unidentified persons, analytics, and notification
+delivery.
 
 Remaining before a pilot: the citizen, field officer and responder mobile
-applications; the GIS command map; the notification delivery workers; load
-testing; and an independent
-security assessment. [docs/architecture.md](docs/architecture.md#what-is-not-built-yet)
-sets out what each needs.
+applications; load testing; and an independent security assessment.
+[docs/architecture.md](docs/architecture.md#what-is-not-built-yet) sets out what
+each needs.
 
 ## Licence
 

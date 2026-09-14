@@ -247,6 +247,46 @@ a job it attended cannot debrief it or answer a complaint about it.
 
 ## Decisions worth explaining
 
+### The command map draws itself, and fetches nothing
+
+There is no basemap on the command map and there will not be one from a tile
+provider.
+
+A web map works by asking a third party for a few hundred images a minute, each
+named after a rectangle of the world. Over a shift in a control room that is a
+continuous description of which parts of Plateau State somebody is watching —
+delivered to a company under no obligation to anybody here, and correlatable
+with the times of day when something is happening. It is not the sort of thing
+that shows up in an audit trail, because it never touches the platform.
+
+So the map draws what the platform holds: the positions, a graticule and a scale
+bar, as inline SVG rendered on the server. The portal's content-security policy
+forbids every external origin, so this is enforced rather than merely intended,
+and an end-to-end test asserts that the page makes no request off the host.
+
+Two consequences worth stating.
+
+**Nothing on the picture is inferred.** An incident reported by address has no
+coordinate, and it is listed beside the map rather than placed at the centre of
+its local government. A pin somebody chose is a pin a crew drives to. Every
+coordinate that is drawn carries the provenance of how it was obtained, and the
+page says in words how much each one should be trusted — "reported from the
+scene" is a different thing from "given by the caller".
+
+**The table under the picture is not a fallback.** A scatter of marks is
+unreadable to a screen reader and to anybody who cannot tell one colour from
+another, so everything on the plot is also below it, in order of urgency, with
+the severity in words. The shapes differ as well as the colours: a circle is an
+incident, a square is a unit.
+
+The spatial indexes this needs were created in migration 0009 and, until this
+phase, queried by nothing: the platform's one proximity query measured a
+great-circle distance over every unit in the state and sorted the result. A map
+asks for "everything inside this rectangle" several times a minute, so the
+bounding box now goes into the `WHERE` clause and the index is usable — with a
+fallback to the whole fleet when the box finds nothing, because a slow answer
+beats a wrong one when somebody is waiting for an ambulance.
+
 ### A message that leaves the platform carries a notice, not the thing itself
 
 The same event produces different text on different channels, and the difference
@@ -405,7 +445,6 @@ The API and the four portals are the surface today. Still to build:
 - **Mobile applications** for citizens, field officers and responders, including
   the controlled offline mode described in §56 — encrypted, expiring,
   device-bound, minimal, revocable, and never a copy of the registry.
-- **The GIS command map**: the data and the PostGIS indexes are in place.
 - **Load testing** against statewide volumes, and an independent security
   assessment. Neither can be self-certified, and neither has been done.
 

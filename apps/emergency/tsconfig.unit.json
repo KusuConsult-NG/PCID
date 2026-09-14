@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "incremental": false
+  },
+  "include": ["test/**/*.ts", "src/lib/**/*.ts"],
+  "exclude": ["node_modules"]
+}

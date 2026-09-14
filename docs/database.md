@@ -31,10 +31,32 @@ npm run db:seed       # reference data; also idempotent
 | `0010_citizen_portal`            | Credentials, verification tokens, and the resident's self-service state                                               |
 | `0011_audit_chain_serialisation` | The locked chain head that makes the audit chain correct under concurrency                                            |
 | `0012_notification_delivery`     | Templates, backoff, suppression, deduplication, and the per-attempt delivery record                                   |
+| `0013_spatial_lookup`            | Position indexes the command map's bounding-box queries actually use                                                  |
 
 ## Invariants held by the database
 
 These are the guarantees that do not depend on application code being correct.
+
+### A proximity query is bounded before it is measured
+
+0009 added GiST indexes on a generated geography column, and only where PostGIS
+is installed. Nothing queried them: the platform's one proximity query computed
+a great-circle distance for every row in the table and sorted the result, which
+is a sequential scan whether PostGIS is present or not.
+
+0013 adds partial b-tree indexes on `(latitude, longitude)` for the portable
+path — the one every deployment without PostGIS uses, and the one the platform
+must be fully functional on. Latitude leads because a bounding box on the ground
+is narrow in latitude and the planner can range-scan it before filtering
+longitude. They are partial because most rows in both tables never carry a
+coordinate: an incident reported by address has none, and a unit that has not
+reported its position has none.
+
+The application side is what makes them usable: the bounding box goes into the
+`WHERE` clause and the distance is computed only for the rows that survive it.
+When the box finds nothing, the query falls back to measuring the whole fleet
+rather than answering "nothing to send" — a slow answer beats a wrong one when
+somebody is waiting for an ambulance.
 
 ### A message is never sent twice, and never sent for ever
 

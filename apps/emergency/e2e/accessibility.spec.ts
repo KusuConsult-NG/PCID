@@ -18,6 +18,7 @@ const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const SIGNED_IN = [
   '/home',
   '/incidents',
+  '/map',
   '/identify',
   '/units',
   '/unidentified-persons',

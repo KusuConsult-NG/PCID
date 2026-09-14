@@ -25,6 +25,7 @@ import { signOut } from '../sign-in/actions';
 const SECTIONS: readonly { href: string; label: string; actions: readonly string[] }[] = [
   { href: '/home', label: 'Board', actions: [] },
   { href: '/incidents', label: 'Incidents', actions: ['INCIDENT_VIEW', 'INCIDENT_CREATE'] },
+  { href: '/map', label: 'Map', actions: ['INCIDENT_VIEW', 'RESPONSE_UNIT_VIEW'] },
   { href: '/identify', label: 'Identify someone', actions: ['EMERGENCY_PROFILE_VIEW'] },
   { href: '/units', label: 'Units', actions: ['RESPONSE_UNIT_VIEW', 'RESPONSE_UNIT_MANAGE'] },
   {
