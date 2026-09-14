@@ -28,12 +28,14 @@ documentRoute({
   path: '/api/v1/me/record',
   tag: 'Citizen portal',
   summary: 'The signed-in resident’s own record',
+  actions: ['CITIZEN_VIEW'],
 });
 documentRoute({
   method: 'get',
   path: '/api/v1/me/emergency-contacts',
   tag: 'Citizen portal',
   summary: 'List the contacts to be called in an emergency',
+  actions: ['CITIZEN_VIEW'],
 });
 documentRoute({
   method: 'post',
@@ -43,6 +45,7 @@ documentRoute({
   description:
     'Every change records who made it, so an alteration by an officer is visible as such (§18).',
   body: emergencyContactSchema,
+  actions: ['CITIZEN_UPDATE'],
 });
 documentRoute({
   method: 'delete',
@@ -50,6 +53,7 @@ documentRoute({
   tag: 'Citizen portal',
   summary: 'Remove an emergency contact',
   parameters: [{ name: 'contactId', in: 'path', description: 'Contact id.' }],
+  actions: ['CITIZEN_UPDATE'],
 });
 documentRoute({
   method: 'get',
@@ -59,6 +63,7 @@ documentRoute({
   description:
     'Accesses made under an active investigation may be withheld under a recorded legal basis. ' +
     'The response says so plainly rather than presenting an incomplete list as complete.',
+  actions: ['AUDIT_VIEW'],
 });
 documentRoute({
   method: 'post',
@@ -66,12 +71,14 @@ documentRoute({
   tag: 'Citizen portal',
   summary: 'Ask for something in the record to be corrected',
   body: correctionRequestSchema,
+  actions: ['CORRECTION_REQUEST_CREATE'],
 });
 documentRoute({
   method: 'get',
   path: '/api/v1/me/correction-requests',
   tag: 'Citizen portal',
   summary: 'Track submitted correction requests',
+  actions: ['CORRECTION_REQUEST_CREATE'],
 });
 documentRoute({
   method: 'patch',
@@ -82,6 +89,7 @@ documentRoute({
     'Changing a contact resets its verification status: the number may now belong to someone else, and an unconfirmed contact should not look confirmed.',
   parameters: [{ name: 'contactId', in: 'path', description: 'Contact id.' }],
   body: emergencyContactSchema,
+  actions: ['CITIZEN_UPDATE'],
 });
 documentRoute({
   method: 'get',
@@ -90,6 +98,7 @@ documentRoute({
   summary: 'The digital PCID credential and a fresh verification code',
   description:
     'Returns the credential and the URL its QR encodes. The URL ends in an opaque token that carries no name, no PCID and no date of birth, and expires within minutes, so a screenshot of somebody else\u2019s screen stops working. Resolving it requires an authenticated officer.',
+  actions: ['CREDENTIAL_VIEW'],
 });
 documentRoute({
   method: 'post',
@@ -99,12 +108,14 @@ documentRoute({
   description:
     'Revokes the credential and invalidates every code issued against it. The PCID itself is unaffected: a credential can be replaced, an identity cannot.',
   body: credentialRevokeSchema,
+  actions: ['CREDENTIAL_REVOKE'],
 });
 documentRoute({
   method: 'get',
   path: '/api/v1/me/verification-history',
   tag: 'Citizen portal',
   summary: 'When and by whom this credential has been verified',
+  actions: ['AUDIT_VIEW'],
 });
 documentRoute({
   method: 'post',
@@ -148,6 +159,7 @@ documentRoute({
   path: '/api/v1/me/notifications',
   tag: 'Citizen portal',
   summary: 'Messages and alerts for this resident',
+  actions: ['CITIZEN_VIEW'],
 });
 documentRoute({
   method: 'post',
@@ -155,6 +167,7 @@ documentRoute({
   tag: 'Citizen portal',
   summary: 'Mark a notification read',
   parameters: [{ name: 'notificationId', in: 'path', description: 'Notification id.' }],
+  actions: ['CITIZEN_VIEW'],
 });
 documentRoute({
   method: 'post',
@@ -164,6 +177,7 @@ documentRoute({
   description:
     'Creates an incident for the emergency service. Coordinates are shared only if the resident chooses to, are recorded as caller-supplied, and carry a retention date. Without them the registered address is used as a starting point.',
   body: emergencyRequestSchema,
+  actions: ['INCIDENT_CREATE'],
 });
 documentRoute({
   method: 'post',
@@ -171,6 +185,7 @@ documentRoute({
   tag: 'Citizen portal',
   summary: 'Report that this identity may have been used by someone else',
   body: citizenReportSchema,
+  actions: ['CORRECTION_REQUEST_CREATE'],
 });
 documentRoute({
   method: 'post',
@@ -180,6 +195,7 @@ documentRoute({
   description:
     'Quote the reference shown against the access. The audit record cannot be altered or deleted, so it will still be there when the Data Protection Officer reviews it.',
   body: citizenReportSchema,
+  actions: ['CORRECTION_REQUEST_CREATE'],
 });
 
 /**

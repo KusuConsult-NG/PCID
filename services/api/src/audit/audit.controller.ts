@@ -33,6 +33,7 @@ documentRoute({
     { name: 'from', in: 'query', description: 'Earliest timestamp, inclusive.' },
     { name: 'to', in: 'query', description: 'Latest timestamp, inclusive.' },
   ],
+  actions: ['AUDIT_VIEW'],
 });
 documentRoute({
   method: 'get',
@@ -42,6 +43,7 @@ documentRoute({
   description:
     'Recomputes the hash chain in the database and reports any row whose content or predecessor ' +
     'does not agree. An intact chain is evidence the history has not been altered.',
+  actions: ['AUDIT_VERIFY'],
 });
 
 @Controller('api/v1/audit')

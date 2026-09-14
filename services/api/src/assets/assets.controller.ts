@@ -35,6 +35,7 @@ documentRoute({
     { name: 'caseRef', in: 'query', description: 'Case authorising an investigative query.' },
     { name: 'incidentRef', in: 'query', description: 'Incident authorising an emergency query.' },
   ],
+  actions: ['VEHICLE_SEARCH'],
 });
 documentRoute({
   method: 'get',
@@ -51,6 +52,7 @@ documentRoute({
     },
     { name: 'caseRef', in: 'query', description: 'Case the record is associated with (§22).' },
   ],
+  actions: ['VEHICLE_VIEW'],
 });
 documentRoute({
   method: 'get',
@@ -71,6 +73,7 @@ documentRoute({
     { name: 'address', in: 'query', description: 'Partial address.' },
     { name: 'lgaCode', in: 'query', description: 'Local Government Area.' },
   ],
+  actions: ['PROPERTY_SEARCH'],
 });
 documentRoute({
   method: 'get',
@@ -86,6 +89,7 @@ documentRoute({
       description: 'The lawful purpose for this access.',
     },
   ],
+  actions: ['PROPERTY_VIEW'],
 });
 
 @Controller('api/v1')

@@ -31,6 +31,7 @@ documentRoute({
     'assigned to it. Any coordinate supplied is stored with its provenance and a retention date; ' +
     'the platform holds no means of locating a person.',
   body: createIncidentSchema,
+  actions: ['INCIDENT_CREATE'],
 });
 documentRoute({
   method: 'get',
@@ -43,6 +44,7 @@ documentRoute({
     { name: 'lgaCode', in: 'query', description: 'Filter by Local Government Area.' },
     { name: 'activeOnly', in: 'query', description: 'Only incidents still in progress.' },
   ],
+  actions: ['INCIDENT_VIEW'],
 });
 documentRoute({
   method: 'get',
@@ -52,6 +54,7 @@ documentRoute({
   parameters: [
     { name: 'reference', in: 'path', description: 'Incident number, e.g. INC-2026-000123.' },
   ],
+  actions: ['INCIDENT_VIEW'],
 });
 documentRoute({
   method: 'patch',
@@ -61,6 +64,7 @@ documentRoute({
   description: 'Closing an incident also closes the emergency access it authorised.',
   parameters: [{ name: 'reference', in: 'path', description: 'Incident number.' }],
   body: incidentStatusSchema,
+  actions: ['INCIDENT_UPDATE', 'INCIDENT_CLOSE'],
 });
 documentRoute({
   method: 'post',
@@ -71,6 +75,7 @@ documentRoute({
     'Used when a casualty is identified, or when an unidentified person record is linked.',
   parameters: [{ name: 'reference', in: 'path', description: 'Incident number.' }],
   body: incidentPersonSchema,
+  actions: ['INCIDENT_UPDATE'],
 });
 documentRoute({
   method: 'post',
@@ -82,6 +87,7 @@ documentRoute({
     'emergency access for the attending crew.',
   parameters: [{ name: 'reference', in: 'path', description: 'Incident number.' }],
   body: dispatchSchema,
+  actions: ['DISPATCH_CREATE'],
 });
 documentRoute({
   method: 'patch',
@@ -90,6 +96,7 @@ documentRoute({
   summary: 'Update a dispatch as the unit acknowledges, travels, arrives and completes',
   parameters: [{ name: 'dispatchId', in: 'path', description: 'Dispatch id.' }],
   body: dispatchStatusSchema,
+  actions: ['DISPATCH_UPDATE'],
 });
 documentRoute({
   method: 'get',
@@ -106,6 +113,7 @@ documentRoute({
       description: 'Return available units nearest this incident.',
     },
   ],
+  actions: ['RESPONSE_UNIT_VIEW'],
 });
 documentRoute({
   method: 'post',
@@ -117,6 +125,7 @@ documentRoute({
     'itself. There is no citizen equivalent.',
   parameters: [{ name: 'unitCode', in: 'path', description: 'Unit code.' }],
   body: unitPositionSchema,
+  actions: ['DISPATCH_UPDATE'],
 });
 
 @Controller('api/v1')

@@ -27,6 +27,7 @@ documentRoute({
   path: '/api/v1/integrations',
   tag: 'Integrations',
   summary: 'Data sources and the freshness of each projection',
+  actions: ['ADMIN_INTEGRATION_MANAGE'],
 });
 documentRoute({
   method: 'post',
@@ -39,6 +40,7 @@ documentRoute({
     'fixture-backed and refuse to load in a production process.',
   body: dataSourceSchema,
   requiresStepUp: true,
+  actions: ['ADMIN_INTEGRATION_MANAGE'],
 });
 documentRoute({
   method: 'post',
@@ -52,6 +54,7 @@ documentRoute({
     'projection serving, marked with its age.',
   parameters: [{ name: 'dataSourceId', in: 'path', description: 'Data source id.' }],
   requiresStepUp: true,
+  actions: ['ADMIN_INTEGRATION_MANAGE'],
 });
 
 @Controller('api/v1/integrations')

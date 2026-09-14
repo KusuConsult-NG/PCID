@@ -1,9 +1,15 @@
-import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { z } from 'zod';
 
 import { contextOf } from '../common/correlation';
-import { agencySchema, agencyStatusSchema, classificationSchema, uuidSchema } from '../common/dto';
+import {
+  agencySchema,
+  agencyStatusSchema,
+  classificationSchema,
+  userQueueSchema,
+  uuidSchema,
+} from '../common/dto';
 import { documentRoute } from '../common/openapi/registry';
 import { validate } from '../common/zod-validation.pipe';
 import { Actor, RequiresStepUp } from './actor';
@@ -31,6 +37,7 @@ documentRoute({
   path: '/api/v1/agencies',
   tag: 'Administration',
   summary: 'List agencies in the Government Agency Registry',
+  actions: ['ADMIN_AGENCY_MANAGE'],
 });
 documentRoute({
   method: 'post',
@@ -42,6 +49,7 @@ documentRoute({
     'until it is deliberately activated.',
   body: agencySchema,
   requiresStepUp: true,
+  actions: ['ADMIN_AGENCY_MANAGE'],
 });
 documentRoute({
   method: 'patch',
@@ -54,6 +62,7 @@ documentRoute({
   parameters: [{ name: 'agencyId', in: 'path', description: 'Agency id.' }],
   body: agencyStatusSchema,
   requiresStepUp: true,
+  actions: ['ADMIN_AGENCY_MANAGE'],
 });
 documentRoute({
   method: 'post',
@@ -66,6 +75,27 @@ documentRoute({
   parameters: [{ name: 'agencyId', in: 'path', description: 'Agency id.' }],
   body: compartmentSchema,
   requiresStepUp: true,
+  actions: ['ADMIN_POLICY_MANAGE'],
+});
+documentRoute({
+  method: 'get',
+  path: '/api/v1/users',
+  tag: 'Administration',
+  summary: 'Government users, for access review',
+  description:
+    'Carries what an access review turns on: whether the account is still active, whether its ' +
+    'authenticator was ever confirmed, what roles it holds and when it was last used. It carries ' +
+    'no citizen data - administering the platform is not an entitlement to the register. An ' +
+    'administrator who is not a platform administrator sees their own agency only.',
+  parameters: [
+    {
+      name: 'agencyId',
+      in: 'query',
+      description: 'Platform administrators only; ignored otherwise.',
+    },
+    { name: 'status', in: 'query', description: 'Filter by account status.' },
+  ],
+  actions: ['ADMIN_USER_MANAGE'],
 });
 documentRoute({
   method: 'post',
@@ -78,6 +108,7 @@ documentRoute({
     'not MFA-enrolled.',
   body: createUserSchema,
   requiresStepUp: true,
+  actions: ['ADMIN_USER_MANAGE'],
 });
 documentRoute({
   method: 'post',
@@ -152,6 +183,25 @@ export class AdminController {
   ): Promise<unknown> {
     const input = validate(compartmentSchema, body);
     return this.admin.grantCompartment(actor, agencyId, input.legalBasis, contextOf(request));
+  }
+
+  @Get('users')
+  async listUsers(
+    @Actor() actor: AuthenticatedActor,
+    @Query() query: unknown,
+    @Req() request: Request,
+  ): Promise<unknown> {
+    const input = validate(userQueueSchema, query);
+    return this.admin.listUsers(
+      actor,
+      {
+        ...(input.agencyId !== undefined ? { agencyId: input.agencyId } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        limit: input.limit,
+        offset: input.offset,
+      },
+      contextOf(request),
+    );
   }
 
   @RequiresStepUp()

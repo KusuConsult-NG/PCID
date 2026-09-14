@@ -27,6 +27,7 @@ documentRoute({
   summary: 'Report a missing person',
   description: 'Open to authorised officers and, through the citizen portal, to the public.',
   body: createMissingPersonSchema,
+  actions: ['MISSING_PERSON_CREATE'],
 });
 documentRoute({
   method: 'get',
@@ -38,6 +39,7 @@ documentRoute({
     { name: 'openOnly', in: 'query', description: 'Only cases still open.' },
     { name: 'lgaCode', in: 'query', description: 'Filter by last-seen LGA.' },
   ],
+  actions: ['MISSING_PERSON_VIEW'],
 });
 documentRoute({
   method: 'get',
@@ -47,6 +49,7 @@ documentRoute({
   parameters: [
     { name: 'reference', in: 'path', description: 'Case reference, e.g. MP-2026-00042.' },
   ],
+  actions: ['MISSING_PERSON_VIEW'],
 });
 documentRoute({
   method: 'post',
@@ -57,6 +60,7 @@ documentRoute({
     'Produces candidates with every contributing factor and its weight. A candidate is never an ' +
     'identification: confirming one is a separate act by a named officer (§13, §66).',
   parameters: [{ name: 'reference', in: 'path', description: 'Case reference.' }],
+  actions: ['MATCH_RUN'],
 });
 documentRoute({
   method: 'post',
@@ -68,6 +72,7 @@ documentRoute({
     'reviewer, so an automated path cannot produce one.',
   parameters: [{ name: 'matchId', in: 'path', description: 'Candidate match id.' }],
   body: matchReviewSchema,
+  actions: ['MATCH_CONFIRM'],
 });
 documentRoute({
   method: 'post',
@@ -76,6 +81,7 @@ documentRoute({
   summary: 'Record the outcome of a missing-person case',
   parameters: [{ name: 'reference', in: 'path', description: 'Case reference.' }],
   body: missingPersonResolveSchema,
+  actions: ['MISSING_PERSON_RESOLVE'],
 });
 documentRoute({
   method: 'post',
@@ -90,6 +96,7 @@ documentRoute({
     { name: 'incidentRef', in: 'query', description: 'Incident the person was encountered at.' },
   ],
   body: createUnidentifiedPersonSchema,
+  actions: ['UNIDENTIFIED_PERSON_CREATE'],
 });
 
 @Controller('api/v1')

@@ -7,6 +7,7 @@ import {
   citizenSearchSchema,
   citizenViewQuerySchema,
   accessReferencesSchema,
+  duplicateQueueSchema,
   duplicateReviewSchema,
   registrationSchema,
   verifyCredentialSchema,
@@ -46,6 +47,7 @@ documentRoute({
     { name: 'caseRef', in: 'query', description: 'Case authorising an investigative search.' },
     { name: 'incidentRef', in: 'query', description: 'Incident authorising an emergency search.' },
   ],
+  actions: ['CITIZEN_SEARCH'],
 });
 documentRoute({
   method: 'get',
@@ -71,6 +73,7 @@ documentRoute({
       description: 'Break-glass grant being relied upon (§23).',
     },
   ],
+  actions: ['CITIZEN_VIEW'],
 });
 documentRoute({
   method: 'get',
@@ -90,6 +93,17 @@ documentRoute({
     },
     { name: 'caseRef', in: 'query', description: 'Case the access is made under.' },
     { name: 'incidentRef', in: 'query', description: 'Incident the access is made under.' },
+  ],
+  actions: [
+    'CITIZEN_VIEW',
+    'PROPERTY_VIEW',
+    'VEHICLE_VIEW',
+    'BUSINESS_VIEW',
+    'LICENCE_VIEW',
+    'REVENUE_VIEW',
+    'PROGRAMME_VIEW',
+    'CASE_VIEW',
+    'MISSING_PERSON_VIEW',
   ],
 });
 documentRoute({
@@ -120,6 +134,7 @@ documentRoute({
       description: 'Break-glass grant, where there was no time to be assigned.',
     },
   ],
+  actions: ['EMERGENCY_PROFILE_VIEW'],
 });
 documentRoute({
   method: 'post',
@@ -130,6 +145,7 @@ documentRoute({
     'Answers only whether the identifier matches an active record, at what assurance level, and ' +
     'the name printed on the credential. It releases no other attribute.',
   body: verifySchema,
+  actions: ['CITIZEN_VERIFY'],
 });
 documentRoute({
   method: 'post',
@@ -139,6 +155,7 @@ documentRoute({
   description:
     'Resolves the opaque token a credential QR carries. The token alone authorises nothing: the caller must be an authenticated officer holding the verification action, and the response says only whether the credential is live and the name printed on it. Expired, revoked and already-used codes are reported plainly so the officer knows to ask for a fresh one.',
   body: verifyCredentialSchema,
+  actions: ['CITIZEN_VERIFY'],
 });
 documentRoute({
   method: 'post',
@@ -153,6 +170,7 @@ documentRoute({
   responses: {
     '200': 'Either an issued PCID, or a DUPLICATE_REVIEW outcome with the matching factors.',
   },
+  actions: ['CITIZEN_CREATE'],
 });
 documentRoute({
   method: 'post',
@@ -163,6 +181,26 @@ documentRoute({
     'Deliberately not self-service: an open enrolment endpoint on a state identity registry would ' +
     'let anyone who knows a PCID claim the record. The temporary passphrase is shown once.',
   parameters: [{ name: 'pcid', in: 'path', description: 'Plateau Citizen ID.' }],
+  actions: ['CITIZEN_UPDATE'],
+});
+documentRoute({
+  method: 'get',
+  path: '/api/v1/citizens/duplicates',
+  tag: 'Citizens',
+  summary: 'Duplicate candidates awaiting a human decision',
+  description:
+    'Registration stops when a new application closely matches somebody already registered, and ' +
+    'nothing is issued or merged until a named officer decides. This is that queue: both people ' +
+    'described through the same field paths and released under the same decision, with the ' +
+    'attributes that drove the score, so the reviewer can see the reasoning rather than a number.',
+  parameters: [
+    {
+      name: 'status',
+      in: 'query',
+      description: 'Which candidates to list. Defaults to those awaiting review.',
+    },
+  ],
+  actions: ['DUPLICATE_REVIEW'],
 });
 documentRoute({
   method: 'post',
@@ -172,6 +210,7 @@ documentRoute({
   description: 'Records a named officer’s decision. Records are never merged automatically.',
   parameters: [{ name: 'candidateId', in: 'path', description: 'Duplicate candidate id.' }],
   body: duplicateReviewSchema,
+  actions: ['DUPLICATE_REVIEW'],
 });
 
 @Controller('api/v1')
@@ -209,6 +248,22 @@ export class CitizensController {
         incidentRef: input.incidentRef ?? null,
         breakGlassRef: input.breakGlassRef ?? null,
       },
+      contextOf(request),
+    );
+  }
+
+  // Declared before `citizens/:pcid` would otherwise claim it: "duplicates" is
+  // not a Plateau Citizen ID, and the route table is ordered, not scored.
+  @Get('citizens/duplicates')
+  async duplicateQueue(
+    @Actor() actor: AuthenticatedActor,
+    @Query() query: unknown,
+    @Req() request: Request,
+  ): Promise<unknown> {
+    const input = validate(duplicateQueueSchema, query);
+    return this.registration.listDuplicateCandidates(
+      actor,
+      { status: input.status, limit: input.limit, offset: input.offset },
       contextOf(request),
     );
   }

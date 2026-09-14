@@ -95,6 +95,44 @@ export function citizenFieldValues(
   };
 }
 
+/**
+ * Map a submitted registration onto catalogue field paths.
+ *
+ * A duplicate review compares somebody already on the register with somebody
+ * standing at a desk, and the second of those has no citizen row yet. Putting
+ * the application through the same paths means the reviewer sees the two people
+ * described identically, and means the application is subject to the same field
+ * release as the record - an applicant's date of birth is not less protected for
+ * not having been accepted yet.
+ */
+export function applicantFieldValues(payload: Record<string, unknown>): Record<string, unknown> {
+  const text = (key: string): string | null => {
+    const value = payload[key];
+    return typeof value === 'string' && value.trim() !== '' ? value : null;
+  };
+  const dateOfBirth = text('dateOfBirth');
+  const parsed = dateOfBirth === null ? null : new Date(`${dateOfBirth}T00:00:00Z`);
+  return {
+    'citizen.displayName': [text('givenName'), text('middleName'), text('familyName')]
+      .filter((part): part is string => part !== null)
+      .join(' '),
+    'citizen.givenName': text('givenName'),
+    'citizen.middleName': text('middleName'),
+    'citizen.familyName': text('familyName'),
+    'citizen.sex': text('sex'),
+    'citizen.dateOfBirth': dateOfBirth,
+    'citizen.approximateAge':
+      parsed === null || Number.isNaN(parsed.getTime()) ? null : ageInYears(parsed),
+    'citizen.phonePrimary': text('phonePrimary'),
+    'citizen.phoneSecondary': text('phoneSecondary'),
+    'citizen.email': text('email'),
+    'citizen.lgaCode': text('lgaCode'),
+    'citizen.wardCode': text('wardCode'),
+    'citizen.registeredAddress': text('residentialAddress'),
+    'citizen.nin': text('nin'),
+  };
+}
+
 export function ageInYears(dateOfBirth: Date, now: Date = new Date()): number {
   let age = now.getUTCFullYear() - dateOfBirth.getUTCFullYear();
   const monthDelta = now.getUTCMonth() - dateOfBirth.getUTCMonth();
@@ -108,9 +146,53 @@ export function citizenClassification(row: CitizenRow): Classification {
   return row.classification as Classification;
 }
 
-export const CITIZEN_COLUMNS = `
-  id, pcid, status, given_name, middle_name, family_name, display_name, sex, date_of_birth,
-  phone_primary, phone_secondary, email, residential_address, lga_code, ward_code, community_code,
-  photograph_uri, blood_group, emergency_medical_notes, nin, verification_level, classification,
-  source_agency_id, created_at, updated_at
-`;
+/**
+ * The columns a citizen row is read with, as a list.
+ *
+ * Kept as a list rather than a string so a query that needs them qualified or
+ * aliased - joining two people into one row, for instance - can build that
+ * without parsing SQL back apart.
+ */
+export const CITIZEN_COLUMN_LIST = [
+  'id',
+  'pcid',
+  'status',
+  'given_name',
+  'middle_name',
+  'family_name',
+  'display_name',
+  'sex',
+  'date_of_birth',
+  'phone_primary',
+  'phone_secondary',
+  'email',
+  'residential_address',
+  'lga_code',
+  'ward_code',
+  'community_code',
+  'photograph_uri',
+  'blood_group',
+  'emergency_medical_notes',
+  'nin',
+  'verification_level',
+  'classification',
+  'source_agency_id',
+  'created_at',
+  'updated_at',
+] as const satisfies readonly (keyof CitizenRow)[];
+
+export const CITIZEN_COLUMNS = CITIZEN_COLUMN_LIST.join(', ');
+
+/** The same columns, qualified and aliased, for a query that joins two people. */
+export function citizenColumnsAliased(table: string, prefix: string): string {
+  return CITIZEN_COLUMN_LIST.map((column) => `${table}.${column} AS ${prefix}_${column}`).join(
+    ', ',
+  );
+}
+
+/** Rebuild a citizen row from a result row whose columns carry that prefix. */
+export function citizenRowFromPrefixed(row: Record<string, unknown>, prefix: string): CitizenRow {
+  const rebuilt: Record<string, unknown> = {};
+  for (const column of CITIZEN_COLUMN_LIST) rebuilt[column] = row[`${prefix}_${column}`];
+  return rebuilt as unknown as CitizenRow;
+}

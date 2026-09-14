@@ -4,6 +4,7 @@ import { DEFAULT_LAW_ENFORCEMENT_COMPARTMENT_CATEGORIES } from '@pcid/contracts'
 import { AuditService } from '../audit/audit.service';
 import { AppError } from '../common/errors';
 import type { RequestContext } from '../common/correlation';
+import { WhereBuilder } from '../common/sql';
 import { Database } from '../database/pool';
 import { PolicyService } from '../policy/policy.service';
 import { CryptoService } from '../security/crypto.service';
@@ -241,6 +242,102 @@ export class AdminService {
       },
     });
     return { agencyId, compartment: 'LAW_ENFORCEMENT_RESTRICTED' };
+  }
+
+  /**
+   * Government users, for the administrator who has to manage them (§7, §41).
+   *
+   * An administrator could create an account and then had no way to see one,
+   * which is how accounts of people who left last year stay active. The listing
+   * carries the things an access review actually turns on: whether the account
+   * is still active, whether its authenticator was ever confirmed, what it can
+   * do, and when it was last used.
+   *
+   * It carries no citizen data, because administering the platform is not an
+   * entitlement to the register (§7). An administrator scoped to one agency sees
+   * that agency's users and no others.
+   */
+  async listUsers(
+    actor: AuthenticatedActor,
+    options: { agencyId?: string; status?: string; limit: number; offset: number },
+    context: RequestContext,
+  ): Promise<{ total: number; users: Record<string, unknown>[] }> {
+    await this.policy.authorize({
+      actor,
+      action: 'ADMIN_USER_MANAGE',
+      purpose: 'SYSTEM_ADMINISTRATION',
+      resource: {
+        type: 'GOVERNMENT_USER',
+        id: null,
+        classification: 'INTERNAL',
+        subjectPcid: null,
+      },
+      context,
+      auditDetail: { view: 'USER_DIRECTORY' },
+    });
+
+    // A platform administrator sees every agency; anyone else sees their own,
+    // whatever they ask for.
+    const scopedAgencyId = actor.subject.roles.includes('PLATFORM_ADMINISTRATOR')
+      ? (options.agencyId ?? null)
+      : actor.subject.agencyId;
+
+    const where = new WhereBuilder();
+    if (scopedAgencyId !== null) where.add('u.agency_id = ?', scopedAgencyId);
+    if (options.status !== undefined) where.add('u.status = ?', options.status);
+
+    const rows = await this.db.query<{
+      id: string;
+      email: string;
+      full_name: string;
+      status: string;
+      clearance: string;
+      mfa_enrolled: boolean;
+      jurisdiction_scope: string;
+      last_login_at: Date | null;
+      created_at: Date;
+      agency_code: string;
+      agency_name: string;
+      roles: string[] | null;
+    }>(
+      `SELECT u.id, u.email, u.full_name, u.status, u.clearance, u.mfa_enrolled,
+              u.jurisdiction_scope, u.last_login_at, u.created_at,
+              a.code AS agency_code, a.name AS agency_name,
+              array_agg(r.name ORDER BY r.name) FILTER (WHERE r.name IS NOT NULL) AS roles
+         FROM government_user u
+         JOIN agency a ON a.id = u.agency_id
+         LEFT JOIN user_role ur ON ur.user_id = u.id
+         LEFT JOIN role r ON r.id = ur.role_id
+        ${where.sql}
+        GROUP BY u.id, a.code, a.name
+        ORDER BY a.name, u.full_name
+        LIMIT $${where.next()} OFFSET $${where.next(2)}`,
+      where.withExtra(options.limit, options.offset),
+    );
+    const total = await this.db.queryOne<{ count: string }>(
+      `SELECT count(*)::text AS count FROM government_user u ${where.sql}`,
+      [...where.params],
+    );
+
+    return {
+      total: Number(total?.count ?? 0),
+      users: rows.map((row) => ({
+        id: row.id,
+        email: row.email,
+        fullName: row.full_name,
+        status: row.status,
+        clearance: row.clearance,
+        // The single most useful field in an access review: an account that
+        // never confirmed an authenticator cannot reach citizen data at all.
+        authenticatorConfirmed: row.mfa_enrolled,
+        jurisdictionScope: row.jurisdiction_scope,
+        agencyCode: row.agency_code,
+        agency: row.agency_name,
+        roles: row.roles ?? [],
+        lastSignedInAt: row.last_login_at?.toISOString() ?? null,
+        createdAt: row.created_at.toISOString(),
+      })),
+    };
   }
 
   async listAgencies(

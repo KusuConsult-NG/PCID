@@ -38,8 +38,11 @@ import { IncidentsService } from './emergency/incidents.service';
 import { IntegrationController } from './integration/integration.controller';
 import { IntegrationService } from './integration/integration.service';
 import { MatchingEngine } from './missing-persons/matching.engine';
+import { AlertsService } from './oversight/alerts.service';
+import { CorrectionsService } from './oversight/corrections.service';
 import { MissingPersonsController } from './missing-persons/missing-persons.controller';
 import { MissingPersonsService } from './missing-persons/missing-persons.service';
+import { OversightController } from './oversight/oversight.controller';
 import { PcidService } from './identity/pcid.service';
 import { PolicyService } from './policy/policy.service';
 import { RegistrationService } from './identity/registration.service';
@@ -64,6 +67,7 @@ import { SecurityModule } from './security/security.module';
     EmergencyController,
     CasesController,
     MissingPersonsController,
+    OversightController,
     AccessController,
     AuditController,
     AnalyticsController,
@@ -91,6 +95,8 @@ import { SecurityModule } from './security/security.module';
     CasesService,
     MatchingEngine,
     MissingPersonsService,
+    CorrectionsService,
+    AlertsService,
     AccessService,
     AnalyticsService,
     IntegrationService,

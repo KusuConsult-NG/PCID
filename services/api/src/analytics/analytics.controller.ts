@@ -24,6 +24,7 @@ documentRoute({
     'Aggregates only. Buckets below the suppression threshold are reported as suppressed rather ' +
     'than as counts, because a count of one in a ward identifies a person.',
   parameters: analyticsParameters,
+  actions: ['ANALYTICS_VIEW'],
 });
 documentRoute({
   method: 'get',
@@ -32,6 +33,7 @@ documentRoute({
   summary: 'Wards with recurring incident demand',
   description: 'Ward granularity with small-number suppression. Not household or individual level.',
   parameters: analyticsParameters,
+  actions: ['ANALYTICS_VIEW'],
 });
 documentRoute({
   method: 'get',
@@ -41,6 +43,7 @@ documentRoute({
   description:
     'Grouped by unit type and agency, never by individual responder: this measures capacity.',
   parameters: analyticsParameters.slice(0, 2),
+  actions: ['ANALYTICS_VIEW'],
 });
 documentRoute({
   method: 'get',
@@ -48,6 +51,7 @@ documentRoute({
   tag: 'Analytics',
   summary: 'Missing-person case volumes and time to resolution',
   parameters: analyticsParameters.slice(0, 2),
+  actions: ['ANALYTICS_VIEW'],
 });
 
 @Controller('api/v1/analytics')

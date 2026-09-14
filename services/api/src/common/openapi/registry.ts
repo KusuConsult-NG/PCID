@@ -1,3 +1,4 @@
+import type { Action } from '@pcid/contracts';
 import type { ZodTypeAny } from 'zod';
 
 import { zodToJsonSchema } from './zod-to-schema';
@@ -21,6 +22,19 @@ export interface RouteDocumentation {
   readonly responses?: Readonly<Record<string, string>>;
   readonly public?: boolean;
   readonly requiresStepUp?: boolean;
+  /**
+   * The authorisation action this route performs, where it performs one.
+   *
+   * Published in the contract so an integrator can see which entitlement a call
+   * needs before making it, and asserted against the seeded roles in
+   * `test/unit/action-coverage.test.ts`: an action a role grants but no route
+   * performs is an entitlement nobody can exercise, which is how three of these
+   * went unnoticed until the government portal needed them.
+   *
+   * Routes that perform several actions list them all. Routes that perform none
+   * - signing in, a health probe - leave it undefined.
+   */
+  readonly actions?: readonly Action[];
 }
 
 const routes: RouteDocumentation[] = [];
@@ -48,6 +62,7 @@ export function buildOpenApiDocument(options: {
       summary: route.summary,
       ...(route.description === undefined ? {} : { description: route.description }),
       security: route.public === true ? [] : [{ bearerAuth: [] }],
+      ...(route.actions === undefined ? {} : { 'x-pcid-actions': [...route.actions] }),
       parameters: [
         ...(route.parameters ?? []).map((parameter) => ({
           name: parameter.name,

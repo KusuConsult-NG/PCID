@@ -25,6 +25,7 @@ documentRoute({
   description:
     'The officer who opens a case is assigned to it. Cases carry a classification and an owning agency.',
   body: createCaseSchema,
+  actions: ['CASE_CREATE'],
 });
 documentRoute({
   method: 'get',
@@ -36,6 +37,7 @@ documentRoute({
     { name: 'status', in: 'query', description: 'Filter by status.' },
     { name: 'type', in: 'query', description: 'Filter by case type.' },
   ],
+  actions: ['CASE_VIEW'],
 });
 documentRoute({
   method: 'get',
@@ -45,6 +47,7 @@ documentRoute({
   parameters: [
     { name: 'reference', in: 'path', description: 'Case number, e.g. CASE-2026-00928.' },
   ],
+  actions: ['CASE_VIEW'],
 });
 documentRoute({
   method: 'post',
@@ -56,6 +59,7 @@ documentRoute({
     'justification and is audited as a LINK_RECORD event in its own right.',
   parameters: [{ name: 'reference', in: 'path', description: 'Case number.' }],
   body: caseLinkSubjectSchema,
+  actions: ['CASE_LINK_SUBJECT'],
 });
 documentRoute({
   method: 'post',
@@ -64,6 +68,7 @@ documentRoute({
   summary: 'Assign an officer to the case',
   parameters: [{ name: 'reference', in: 'path', description: 'Case number.' }],
   body: caseAssignSchema,
+  actions: ['CASE_ASSIGN'],
 });
 documentRoute({
   method: 'post',
@@ -73,6 +78,7 @@ documentRoute({
   description: 'A closed case authorises no further access.',
   parameters: [{ name: 'reference', in: 'path', description: 'Case number.' }],
   body: caseCloseSchema,
+  actions: ['CASE_CLOSE'],
 });
 
 @Controller('api/v1/cases')

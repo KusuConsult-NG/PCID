@@ -7,6 +7,13 @@ import type { RequestContext } from '../common/correlation';
 import { Database } from '../database/pool';
 import type { AuthenticatedActor } from '../iam/actor';
 import { PolicyService } from '../policy/policy.service';
+import { project, withheld } from '../common/projection';
+import {
+  applicantFieldValues,
+  citizenColumnsAliased,
+  citizenFieldValues,
+  citizenRowFromPrefixed,
+} from './citizen.mapper';
 import { DuplicateDetectionService } from './duplicate-detection';
 import type { DuplicateCandidate } from './duplicate-detection';
 import { PcidService } from './pcid.service';
@@ -28,6 +35,33 @@ export interface RegistrationInput {
   /** Optional external identifier, supplied only by an authoritative source. */
   readonly nin?: string | null;
 }
+
+/**
+ * What a reviewer needs to tell two people apart, and no more.
+ *
+ * Named explicitly rather than requesting everything the catalogue would
+ * release, so the queue does not quietly widen when a field is added: deciding
+ * whether two records are the same person is a question about names, dates,
+ * contact details and where somebody lives.
+ */
+const DUPLICATE_REVIEW_FIELDS = [
+  'citizen.pcid',
+  'citizen.status',
+  'citizen.displayName',
+  'citizen.givenName',
+  'citizen.middleName',
+  'citizen.familyName',
+  'citizen.sex',
+  'citizen.dateOfBirth',
+  'citizen.approximateAge',
+  'citizen.phonePrimary',
+  'citizen.phoneSecondary',
+  'citizen.email',
+  'citizen.lgaCode',
+  'citizen.wardCode',
+  'citizen.registeredAddress',
+  'citizen.verificationLevel',
+] as const;
 
 export type RegistrationOutcome =
   | {
@@ -243,6 +277,83 @@ export class RegistrationService {
         verificationLevel: 'SELF_ASSERTED',
       };
     });
+  }
+
+  /**
+   * The queue of duplicate candidates awaiting a human decision (§51).
+   *
+   * Without this the platform stops a registration, tells the officer at the
+   * desk that it is queued, and then offers nobody any way of finding it again.
+   * A review queue that cannot be listed is a review that does not happen.
+   *
+   * Both people are projected through the policy decision, so the reviewer sees
+   * the attributes the catalogue releases for an identity-integrity review and
+   * no others - and the matched attributes that drove the score, because a
+   * reviewer who cannot see the reasoning is being asked to rubber-stamp.
+   */
+  async listDuplicateCandidates(
+    actor: AuthenticatedActor,
+    options: { status: string; limit: number; offset: number },
+    context: RequestContext,
+  ): Promise<{ total: number; candidates: Record<string, unknown>[] }> {
+    const outcome = await this.policy.authorize({
+      actor,
+      action: 'DUPLICATE_REVIEW',
+      purpose: 'IDENTITY_INTEGRITY_REVIEW',
+      resource: {
+        type: 'CITIZEN',
+        id: null,
+        classification: 'SENSITIVE',
+        subjectPcid: null,
+        requestedFields: DUPLICATE_REVIEW_FIELDS,
+      },
+      context,
+      auditDetail: { view: 'DUPLICATE_REVIEW_QUEUE', status: options.status },
+    });
+
+    const rows = await this.db.query<Record<string, unknown>>(
+      `SELECT dc.id, dc.score, dc.matched_attributes, dc.status, dc.created_at,
+              dc.reviewed_at, dc.review_note,
+              rr.reference AS registration_reference, rr.payload AS registration_payload,
+              ${citizenColumnsAliased('c', 'existing')}
+         FROM duplicate_candidate dc
+         JOIN citizen c ON c.id = dc.existing_citizen_id
+         LEFT JOIN registration_request rr ON rr.id = dc.registration_request_id
+        WHERE dc.status = $1
+        ORDER BY dc.score DESC, dc.created_at ASC
+        LIMIT $2 OFFSET $3`,
+      [options.status, options.limit, options.offset],
+    );
+    const total = await this.db.queryOne<{ count: string }>(
+      'SELECT count(*)::text AS count FROM duplicate_candidate WHERE status = $1',
+      [options.status],
+    );
+
+    return {
+      total: Number(total?.count ?? 0),
+      candidates: rows.map((row) => ({
+        id: row.id as string,
+        score: Number(row.score),
+        status: row.status as string,
+        raisedAt: (row.created_at as Date).toISOString(),
+        reviewedAt: (row.reviewed_at as Date | null)?.toISOString() ?? null,
+        reviewNote: row.review_note as string | null,
+        matchedAttributes: row.matched_attributes,
+        registrationReference: (row.registration_reference as string | null) ?? null,
+        // The person already on the register, projected through the decision.
+        existingPerson: project(
+          outcome.decision,
+          citizenFieldValues(citizenRowFromPrefixed(row, 'existing')),
+        ),
+        // The person at the desk, who has no record yet, described through the
+        // same field paths and released under the same decision.
+        applicant: project(
+          outcome.decision,
+          applicantFieldValues((row.registration_payload as Record<string, unknown>) ?? {}),
+        ),
+        restrictedFields: withheld(outcome.decision),
+      })),
+    };
   }
 
   /** Resolve a queued duplicate candidate. Only a person can do this (§51). */

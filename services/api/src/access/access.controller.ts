@@ -27,6 +27,7 @@ documentRoute({
     'approver sees what the platform concluded rather than only the requester’s account. If the ' +
     'fields are already available to you, the request is not queued and you are told to proceed.',
   body: accessRequestSchema,
+  actions: ['ACCESS_REQUEST_CREATE'],
 });
 documentRoute({
   method: 'get',
@@ -41,6 +42,7 @@ documentRoute({
     },
     { name: 'status', in: 'query', description: 'Filter your own requests by status.' },
   ],
+  actions: ['ACCESS_REQUEST_CREATE', 'ACCESS_REQUEST_APPROVE'],
 });
 documentRoute({
   method: 'post',
@@ -53,6 +55,7 @@ documentRoute({
   parameters: [{ name: 'reference', in: 'path', description: 'Access request reference.' }],
   body: accessDecisionSchema,
   requiresStepUp: true,
+  actions: ['ACCESS_REQUEST_APPROVE'],
 });
 documentRoute({
   method: 'post',
@@ -66,12 +69,14 @@ documentRoute({
     'supervisors immediately, and creates a review obligation due within 24 hours.',
   body: breakGlassSchema,
   requiresStepUp: true,
+  actions: ['BREAK_GLASS_INITIATE'],
 });
 documentRoute({
   method: 'get',
   path: '/api/v1/break-glass/review-queue',
   tag: 'Authorisation',
   summary: 'Break-glass grants awaiting their mandatory post-event review',
+  actions: ['BREAK_GLASS_REVIEW'],
 });
 documentRoute({
   method: 'post',
@@ -81,6 +86,7 @@ documentRoute({
   description: 'An officer cannot review their own emergency access.',
   parameters: [{ name: 'reference', in: 'path', description: 'Break-glass reference.' }],
   body: breakGlassReviewSchema,
+  actions: ['BREAK_GLASS_REVIEW'],
 });
 
 const listQuerySchema = paginationSchema.extend({

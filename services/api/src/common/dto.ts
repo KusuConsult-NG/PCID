@@ -258,6 +258,44 @@ export const breakGlassReviewSchema = z.object({
   note: z.string().min(5).max(2000),
 });
 
+/* --- Oversight: correction review and alert review (§7, §32, §66) --------- */
+
+export const correctionQueueSchema = paginationSchema.extend({
+  status: z
+    .enum(['SUBMITTED', 'EVIDENCE_REQUIRED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'APPLIED'])
+    .optional(),
+  subjectPcid: pcidSchema.optional(),
+});
+
+export const correctionDecisionSchema = z.object({
+  decision: z.enum(['APPROVE', 'REJECT', 'REQUEST_EVIDENCE']),
+  note: z.string().min(5).max(2000),
+});
+
+export const alertQueueSchema = paginationSchema.extend({
+  status: z
+    .enum(['OPEN', 'UNDER_REVIEW', 'ACTIONED', 'DISMISSED_FALSE_POSITIVE', 'CLOSED'])
+    .optional(),
+  category: z.string().max(32).optional(),
+  severity: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']).optional(),
+});
+
+export const alertReviewSchema = z.object({
+  decision: z.enum(['ACTIONED', 'DISMISSED_FALSE_POSITIVE', 'CLOSED']),
+  note: z.string().min(5).max(2000),
+});
+
+export const duplicateQueueSchema = paginationSchema.extend({
+  status: z
+    .enum(['PENDING_REVIEW', 'CONFIRMED_DUPLICATE', 'DISTINCT_PERSON', 'MERGED'])
+    .default('PENDING_REVIEW'),
+});
+
+export const userQueueSchema = paginationSchema.extend({
+  agencyId: uuidSchema.optional(),
+  status: z.enum(['ACTIVE', 'SUSPENDED', 'LOCKED', 'DISABLED']).optional(),
+});
+
 export const auditSearchSchema = paginationSchema.extend({
   actorId: uuidSchema.optional(),
   agencyId: uuidSchema.optional(),
