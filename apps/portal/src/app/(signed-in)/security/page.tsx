@@ -3,11 +3,11 @@ import Link from 'next/link';
 import QRCode from 'qrcode';
 
 import { PageHeader } from '@/components/chrome';
-import { Badge, Empty, Notice } from '@/components/feedback';
-import { Field } from '@/components/fields';
-import { SubmitButton } from '@/components/form';
+import { Badge, Empty, Notice } from '@pcid/portal-kit/components';
+import { Field } from '@pcid/portal-kit/components';
+import { SubmitButton } from '@pcid/portal-kit/components';
 import { callApi, dataOr } from '@/lib/api';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime } from '@pcid/portal-kit/format';
 import { readSession } from '@/lib/session';
 import type { Me, PortalSessionRow } from '@/lib/types';
 

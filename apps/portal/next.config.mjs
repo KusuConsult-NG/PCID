@@ -12,6 +12,8 @@ import { fileURLToPath } from 'node:url';
  */
 const config = {
   reactStrictMode: true,
+  // The shared kit ships TypeScript source, so Next compiles it with the app.
+  transpilePackages: ['@pcid/portal-kit'],
   poweredByHeader: false,
   // Server-rendered throughout: nothing about a citizen's record is static.
   output: 'standalone',

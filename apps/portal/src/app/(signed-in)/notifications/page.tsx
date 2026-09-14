@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 
 import { PageHeader } from '@/components/chrome';
-import { Badge, Empty } from '@/components/feedback';
-import { SubmitButton } from '@/components/form';
+import { Badge, Empty } from '@pcid/portal-kit/components';
+import { SubmitButton } from '@pcid/portal-kit/components';
 import { callApi, dataOr } from '@/lib/api';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime } from '@pcid/portal-kit/format';
 import type { NotificationInbox } from '@/lib/types';
 
 import { markRead } from './actions';

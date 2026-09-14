@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 
 import { PageHeader } from '@/components/chrome';
-import { Badge, Empty, Notice } from '@/components/feedback';
-import { Field, Select, TextArea } from '@/components/fields';
-import { SubmitButton } from '@/components/form';
+import { Badge, Empty, Notice } from '@pcid/portal-kit/components';
+import { Field, Select, TextArea } from '@pcid/portal-kit/components';
+import { SubmitButton } from '@pcid/portal-kit/components';
 import { callApi, dataOr } from '@/lib/api';
-import { fieldLabel, formatDateTime, sentenceCase } from '@/lib/format';
+import { fieldLabel, formatDateTime, sentenceCase } from '@pcid/portal-kit/format';
 import type { CorrectionRequest } from '@/lib/types';
 
 import { requestCorrection } from './actions';

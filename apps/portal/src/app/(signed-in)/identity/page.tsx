@@ -2,11 +2,11 @@ import type { Metadata } from 'next';
 import QRCode from 'qrcode';
 
 import { PageHeader } from '@/components/chrome';
-import { Badge, Notice } from '@/components/feedback';
-import { TextArea } from '@/components/fields';
-import { SubmitButton } from '@/components/form';
+import { Badge, Notice } from '@pcid/portal-kit/components';
+import { TextArea } from '@pcid/portal-kit/components';
+import { SubmitButton } from '@pcid/portal-kit/components';
 import { callApi, dataOr } from '@/lib/api';
-import { formatDate, formatDateTime, relativeMinutes, sentenceCase } from '@/lib/format';
+import { formatDate, formatDateTime, relativeMinutes, sentenceCase } from '@pcid/portal-kit/format';
 import type { CitizenRecord, Credential, VerificationHistory } from '@/lib/types';
 
 import { reportCredentialLost } from './actions';

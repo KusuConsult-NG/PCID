@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 import { PageHeader } from '@/components/chrome';
-import { Badge, Empty, Notice } from '@/components/feedback';
-import { Field, Select } from '@/components/fields';
-import { SubmitButton } from '@/components/form';
+import { Badge, Empty, Notice } from '@pcid/portal-kit/components';
+import { Field, Select } from '@pcid/portal-kit/components';
+import { SubmitButton } from '@pcid/portal-kit/components';
 import { callApi, dataOr } from '@/lib/api';
 import type { EmergencyContact } from '@/lib/types';
 

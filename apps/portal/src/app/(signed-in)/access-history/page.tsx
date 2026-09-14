@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { PageHeader } from '@/components/chrome';
-import { Empty, Notice } from '@/components/feedback';
+import { Empty, Notice } from '@pcid/portal-kit/components';
 import { callApi, dataOr } from '@/lib/api';
-import { actionLabel, formatDateTime, purposeLabel } from '@/lib/format';
+import { formatDateTime } from '@pcid/portal-kit/format';
+import { actionLabel, purposeLabel } from '@/lib/vocabulary';
 import type { AccessHistory } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'Who has seen my record' };

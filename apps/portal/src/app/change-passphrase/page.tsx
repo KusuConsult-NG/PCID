@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import { Masthead, SiteFooter } from '@/components/chrome';
-import { Field } from '@/components/fields';
-import { Notice } from '@/components/feedback';
-import { SubmitButton } from '@/components/form';
+import { Field } from '@pcid/portal-kit/components';
+import { Notice } from '@pcid/portal-kit/components';
+import { SubmitButton } from '@pcid/portal-kit/components';
 import { readSession } from '@/lib/session';
 
 import { changePassphrase } from './actions';

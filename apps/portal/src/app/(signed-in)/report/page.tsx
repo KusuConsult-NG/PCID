@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { PageHeader } from '@/components/chrome';
-import { Notice } from '@/components/feedback';
-import { Field, Select, TextArea } from '@/components/fields';
-import { SubmitButton } from '@/components/form';
+import { Notice } from '@pcid/portal-kit/components';
+import { Field, Select, TextArea } from '@pcid/portal-kit/components';
+import { SubmitButton } from '@pcid/portal-kit/components';
 
 import {
   raiseEmergency,

@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 import { PageHeader } from '@/components/chrome';
-import { Empty, Notice, Restricted } from '@/components/feedback';
+import { Empty, Notice, Restricted } from '@pcid/portal-kit/components';
 import { callApi, dataOr } from '@/lib/api';
-import { fieldLabel, formatDate, sentenceCase } from '@/lib/format';
+import { fieldLabel, formatDate, sentenceCase } from '@pcid/portal-kit/format';
 import type { Card, CitizenRecord } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'My records' };

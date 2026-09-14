@@ -10,6 +10,7 @@
   "workspaces": [
     "packages/contracts",
     "packages/policy",
+    "packages/portal-kit",
     "services/api",
     "apps/portal"
   ],

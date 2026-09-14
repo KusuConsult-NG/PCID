@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { PageHeader } from '@/components/chrome';
-import { Badge, Notice } from '@/components/feedback';
+import { Badge, Notice } from '@pcid/portal-kit/components';
 import { callApi, dataOr } from '@/lib/api';
-import { formatDateTime, purposeLabel, sentenceCase } from '@/lib/format';
+import { formatDateTime, sentenceCase } from '@pcid/portal-kit/format';
+import { purposeLabel } from '@/lib/vocabulary';
 import type {
   AccessHistory,
   CitizenRecord,
