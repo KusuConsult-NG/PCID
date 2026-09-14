@@ -76,6 +76,8 @@ export const ACTIONS = [
   'ALERT_VIEW',
   'ALERT_REVIEW',
   'ANALYTICS_VIEW',
+  'RETENTION_VIEW',
+  'RETENTION_RUN',
 
   // Administration (technical administration is not citizen-data entitlement, §7)
   'ADMIN_AGENCY_MANAGE',
@@ -98,6 +100,7 @@ export type Action = (typeof ACTIONS)[number];
  */
 export const STEP_UP_ACTIONS: readonly Action[] = Object.freeze([
   'CITIZEN_EXPORT',
+  'RETENTION_RUN',
   'BREAK_GLASS_INITIATE',
   'ACCESS_REQUEST_APPROVE',
   'ADMIN_ROLE_MANAGE',

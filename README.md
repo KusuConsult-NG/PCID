@@ -14,26 +14,27 @@ supplied one, and is never required to obtain a PCID.
 
 ## What this repository contains today
 
-| Area                                                          | State                                      |
-| ------------------------------------------------------------- | ------------------------------------------ |
-| Authorisation model, field catalogue, PCID format             | Complete and exhaustively tested           |
-| Citizen registry, registration, duplicate review, corrections | Complete                                   |
-| Government Agency Registry, users, roles, MFA, sessions       | Complete                                   |
-| Immutable hash-chained audit and citizen access transparency  | Complete                                   |
-| Incidents, dispatch, response units, emergency identification | Complete                                   |
-| Cases, case-bound access, access requests, break glass        | Complete                                   |
-| Missing persons, unidentified persons, candidate matching     | Complete                                   |
-| Integration framework and linked-record projections           | Complete (sandbox and production adapters) |
-| Public-safety analytics with small-number suppression         | Complete                                   |
-| Notification delivery: templates, worker, retry, operations   | Complete                                   |
-| GIS command map: bounded spatial queries, the command picture | Complete                                   |
-| Citizen portal (`apps/portal`)                                | Complete                                   |
-| Government portal (`apps/government`)                         | Complete                                   |
-| Security agency portal (`apps/security`)                      | Complete                                   |
-| Emergency response portal (`apps/emergency`)                  | Complete                                   |
-| Oversight: duplicate, correction and alert queues             | Complete                                   |
-| Load testing at statewide volume: harness, results, fixes     | Complete                                   |
-| Mobile applications: installable portals, controlled offline  | Complete                                   |
+| Area                                                           | State                                      |
+| -------------------------------------------------------------- | ------------------------------------------ |
+| Authorisation model, field catalogue, PCID format              | Complete and exhaustively tested           |
+| Citizen registry, registration, duplicate review, corrections  | Complete                                   |
+| Government Agency Registry, users, roles, MFA, sessions        | Complete                                   |
+| Immutable hash-chained audit and citizen access transparency   | Complete                                   |
+| Incidents, dispatch, response units, emergency identification  | Complete                                   |
+| Cases, case-bound access, access requests, break glass         | Complete                                   |
+| Missing persons, unidentified persons, candidate matching      | Complete                                   |
+| Integration framework and linked-record projections            | Complete (sandbox and production adapters) |
+| Public-safety analytics with small-number suppression          | Complete                                   |
+| Notification delivery: templates, worker, retry, operations    | Complete                                   |
+| GIS command map: bounded spatial queries, the command picture  | Complete                                   |
+| Citizen portal (`apps/portal`)                                 | Complete                                   |
+| Government portal (`apps/government`)                          | Complete                                   |
+| Security agency portal (`apps/security`)                       | Complete                                   |
+| Emergency response portal (`apps/emergency`)                   | Complete                                   |
+| Oversight: duplicate, correction and alert queues              | Complete                                   |
+| Load testing at statewide volume: harness, results, fixes      | Complete                                   |
+| Mobile applications: installable portals, controlled offline   | Complete                                   |
+| Retention and erasure: the schedule, applied and on the record | Complete                                   |
 
 Five things run: the REST API, documented in OpenAPI at `/api/v1/docs` (and
 written to `docs/openapi.json` by `npm run openapi`), and four portals — for
@@ -200,6 +201,7 @@ build: `npx playwright install chromium`.
 | Duplicate detection cannot miss a match    | [`services/api/test/unit/duplicate-detection.test.ts`](services/api/test/unit/duplicate-detection.test.ts)   |
 | A search too broad to be an identification | [`services/api/test/integration/security.test.ts`](services/api/test/integration/security.test.ts)           |
 | What a device may keep, and for how long   | [`services/api/test/integration/offline.test.ts`](services/api/test/integration/offline.test.ts)             |
+| Every retention period is actually applied | [`services/api/test/unit/retention-coverage.test.ts`](services/api/test/unit/retention-coverage.test.ts)     |
 
 ## What the platform deliberately cannot do
 
@@ -220,6 +222,12 @@ These are absences by design, and each is held by a test:
   browser will not hand back, expiring in hours, erased when the device is signed
   out, and never composed of anything its holder could not have read on screen.
   The service worker caches the page furniture and no page about a person.
+- **No keeping things for ever by default.** Every category of data carries a
+  period and a stated reason, and a nightly sweep applies them: an incident keeps
+  its record and loses its coordinates after ninety days, a sign-in attempt goes
+  after ninety, a spent session after thirty. What it cannot reach is the
+  register, the case files and the audit trail — marked kept in the catalogue,
+  excluded from the rules, and refused by the database besides.
 - **No bulk export.** No role in the platform grants an export action, and no
   search returns more than a thousand people: a name against a register of four
   million matches a hundred thousand of them, and paging through that is browsing
@@ -249,6 +257,7 @@ These are absences by design, and each is held by a test:
 - [Deployment](docs/deployment.md) — running it in production
 - [Disaster recovery](docs/disaster-recovery.md) — RPO, RTO and the restore drill
 - [Load testing](docs/load-testing.md) — four million records, and what broke
+- [Retention](docs/retention.md) — what is kept, for how long, and what applies it
 - [Mobile](docs/mobile.md) — the applications, and what a device may keep
 - [Incident response](docs/incident-response.md) — when something goes wrong
 - [MDA integration guide](docs/mda-integration.md) — connecting an agency system
@@ -270,12 +279,15 @@ management, missing and unidentified persons, analytics, and notification
 delivery.
 
 Remaining before a pilot: an independent security assessment, which cannot be
-self-certified. The mobile applications are done —
+self-certified. Everything else is built. The mobile applications —
 [docs/mobile.md](docs/mobile.md) sets out what each one is, why they are
 installed from the portal rather than downloaded from a store, and exactly what a
-device is allowed to keep. Load testing is done —
+device is allowed to keep. Load testing —
 [docs/load-testing.md](docs/load-testing.md) records the method, the results, the
-five defects it found, and what it does not establish.
+five defects it found, and what it does not establish. And the retention
+schedule, which for eleven phases was printed in the privacy notice and applied
+by nothing: [docs/retention.md](docs/retention.md) sets out what is kept, for how
+long, why, and what the sweep is structurally unable to reach.
 [docs/architecture.md](docs/architecture.md#what-is-not-built-yet) sets out what
 each needs.
 

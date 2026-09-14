@@ -1,4 +1,4 @@
-import { Badge, Empty, Notice, SubmitButton } from '@pcid/portal-kit/components';
+import { Badge, Empty, Notice, SubmitButton, TableScroll } from '@pcid/portal-kit/components';
 import { formatDateTime, sentenceCase } from '@pcid/portal-kit/format';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -215,7 +215,7 @@ export default async function AccountPage({
         {open.length === 0 ? (
           <Empty>No other sessions.</Empty>
         ) : (
-          <div className="table-scroll">
+          <TableScroll label="Devices signed in to your account">
             <table>
               <caption className="visually-hidden">Devices signed in to your account</caption>
               <thead>
@@ -256,7 +256,7 @@ export default async function AccountPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </section>
 
@@ -293,7 +293,7 @@ export default async function AccountPage({
             offline reading.
           </Empty>
         ) : (
-          <div className="table-scroll">
+          <TableScroll label="Devices registered to your account">
             <table>
               <caption className="visually-hidden">Devices registered to your account</caption>
               <thead>
@@ -341,7 +341,7 @@ export default async function AccountPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </section>
     </>

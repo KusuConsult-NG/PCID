@@ -1,4 +1,4 @@
-import { Badge, Empty, Notice } from '@pcid/portal-kit/components';
+import { Badge, Empty, Notice, TableScroll } from '@pcid/portal-kit/components';
 import { formatDateTime } from '@pcid/portal-kit/format';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -247,7 +247,7 @@ export default async function MapPage({
         {incidents.length === 0 ? (
           <Empty>No incident on the picture.</Empty>
         ) : (
-          <div className="table-scroll">
+          <TableScroll label="Live incidents with a reported position">
             <table>
               <caption className="visually-hidden">Live incidents with a reported position</caption>
               <thead>
@@ -302,7 +302,7 @@ export default async function MapPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </section>
 
@@ -317,7 +317,7 @@ export default async function MapPage({
             here rather than on the map because placing them would mean choosing a point, and a
             point somebody chose is a point a crew drives to.
           </p>
-          <div className="table-scroll">
+          <TableScroll label="Live incidents with no reported position">
             <table>
               <caption className="visually-hidden">
                 Live incidents with no reported position
@@ -349,7 +349,7 @@ export default async function MapPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </section>
       )}
 
@@ -365,7 +365,7 @@ export default async function MapPage({
               the crews say where they are.
             </Empty>
           ) : (
-            <div className="table-scroll">
+            <TableScroll label="Response units with a reported position">
               <table>
                 <caption className="visually-hidden">
                   Response units with a reported position
@@ -401,7 +401,7 @@ export default async function MapPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </section>
       )}

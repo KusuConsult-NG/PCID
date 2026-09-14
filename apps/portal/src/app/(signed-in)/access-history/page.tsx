@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { PageHeader } from '@/components/chrome';
-import { Empty, Notice } from '@pcid/portal-kit/components';
+import { Empty, Notice, TableScroll } from '@pcid/portal-kit/components';
 import { callApi, dataOr } from '@/lib/api';
 import { formatDateTime } from '@pcid/portal-kit/format';
 import { actionLabel, purposeLabel } from '@/lib/vocabulary';
@@ -63,7 +63,7 @@ export default async function AccessHistoryPage({
             {history.accesses.length === 0 ? (
               <Empty>Nobody has opened your record yet.</Empty>
             ) : (
-              <div className="table-scroll">
+              <TableScroll label="Government offices that have opened your record, most recent first">
                 <table>
                   <caption className="visually-hidden">
                     Government offices that have opened your record, most recent first
@@ -89,7 +89,7 @@ export default async function AccessHistoryPage({
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             )}
 
             {pageCount > 1 ? (

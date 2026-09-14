@@ -26,6 +26,7 @@ const SIGNED_IN = [
   '/alerts',
   '/access-requests',
   '/audit',
+  '/retention',
   '/administration',
   '/account',
   '/change-passphrase',

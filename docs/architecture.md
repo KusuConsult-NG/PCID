@@ -463,6 +463,10 @@ home screen and hold a bounded amount offline, and
 [mobile.md](mobile.md) sets out the stack decision, the six §56 properties and
 where each is enforced.
 
+The retention schedule is applied rather than merely written down:
+[retention.md](retention.md) sets out the catalogue, the sweep, the ledger, and
+what the sweep is structurally unable to reach.
+
 Load testing against statewide volumes is done: [load-testing.md](load-testing.md)
 records what was measured, the five defects it found, and — set out at the end —
 what it does not establish, chief among which is capacity on production hardware.

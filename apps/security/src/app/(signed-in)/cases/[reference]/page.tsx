@@ -5,6 +5,7 @@ import {
   Notice,
   Select,
   SubmitButton,
+  TableScroll,
   TextArea,
 } from '@pcid/portal-kit/components';
 import { formatDateTime, sentenceCase } from '@pcid/portal-kit/format';
@@ -233,7 +234,7 @@ export default async function CasePage({
         {file.subjects.length === 0 ? (
           <Empty>Nobody is linked to this case.</Empty>
         ) : (
-          <div className="table-scroll">
+          <TableScroll label="Subjects linked to this case">
             <table>
               <caption className="visually-hidden">Subjects linked to this case</caption>
               <thead>
@@ -268,7 +269,7 @@ export default async function CasePage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
 
         {closed || !can(session, 'CASE_LINK_SUBJECT') ? null : (

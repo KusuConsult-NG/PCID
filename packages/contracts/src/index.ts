@@ -18,4 +18,5 @@ export * from './notifications';
 export * from './pcid';
 export * from './purpose';
 export * from './resources';
+export * from './retention';
 export * from './roles';

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import QRCode from 'qrcode';
 
 import { PageHeader } from '@/components/chrome';
-import { Badge, Empty, Notice } from '@pcid/portal-kit/components';
+import { Badge, Empty, Notice, TableScroll } from '@pcid/portal-kit/components';
 import { Field } from '@pcid/portal-kit/components';
 import { SubmitButton } from '@pcid/portal-kit/components';
 import { callApi, dataOr } from '@/lib/api';
@@ -179,7 +179,7 @@ export default async function SecurityPage({
         {sessions.length === 0 ? (
           <Empty>No other sessions.</Empty>
         ) : (
-          <div className="table-scroll">
+          <TableScroll label="Devices currently signed in to your account">
             <table>
               <caption className="visually-hidden">
                 Devices currently signed in to your account
@@ -222,7 +222,7 @@ export default async function SecurityPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </section>
 

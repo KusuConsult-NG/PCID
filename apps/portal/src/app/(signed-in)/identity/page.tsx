@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import QRCode from 'qrcode';
 
 import { PageHeader } from '@/components/chrome';
-import { Badge, Notice } from '@pcid/portal-kit/components';
+import { Badge, Notice, TableScroll } from '@pcid/portal-kit/components';
 import { TextArea } from '@pcid/portal-kit/components';
 import { SubmitButton } from '@pcid/portal-kit/components';
 import { callApi, dataOr } from '@/lib/api';
@@ -142,7 +142,7 @@ export default async function IdentityPage({
         {history === null || history.verifications.length === 0 ? (
           <p className="muted">Nobody has checked your ID yet.</p>
         ) : (
-          <div className="table-scroll">
+          <TableScroll label="Occasions on which a government office checked your Plateau Citizen ID">
             <table>
               <caption className="visually-hidden">
                 Occasions on which a government office checked your Plateau Citizen ID
@@ -172,7 +172,7 @@ export default async function IdentityPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </section>
 

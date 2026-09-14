@@ -1,4 +1,11 @@
-import { Badge, Empty, Notice, SubmitButton, TextArea } from '@pcid/portal-kit/components';
+import {
+  Badge,
+  Empty,
+  Notice,
+  SubmitButton,
+  TableScroll,
+  TextArea,
+} from '@pcid/portal-kit/components';
 import { formatDateTime, sentenceCase } from '@pcid/portal-kit/format';
 import type { Metadata } from 'next';
 
@@ -361,7 +368,7 @@ function Table<T>({
 }) {
   if (rows.length === 0) return <Empty>{empty}</Empty>;
   return (
-    <div className="table-scroll">
+    <TableScroll label={caption}>
       <table>
         <caption className="visually-hidden">{caption}</caption>
         <thead>
@@ -383,6 +390,6 @@ function Table<T>({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 }

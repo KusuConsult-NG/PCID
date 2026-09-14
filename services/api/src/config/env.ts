@@ -92,6 +92,27 @@ export const envSchema = z.object({
     .transform((value) => value === 'true'),
   NOTIFICATION_WORKER_INTERVAL_SECONDS: durationSeconds.default(30),
   NOTIFICATION_WORKER_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(25),
+
+  /**
+   * Apply the retention schedule from inside the API process (§21, §68). Off
+   * where a worker runs separately, and off by default - but note that off
+   * everywhere means the schedule is not applied, which is the state this
+   * platform was in for eleven phases. `docs/deployment.md` makes it a
+   * go-live checklist item for that reason.
+   */
+  RETENTION_WORKER_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  /** Nightly. The periods are measured in days; an hourly sweep buys hours. */
+  RETENTION_WORKER_INTERVAL_SECONDS: durationSeconds.default(86_400),
+  /**
+   * Rows one policy may erase in one sweep. The ceiling is the contracts
+   * catalogue's; this is the deployment's choice below it, so a first run
+   * against years of accumulated rows can be walked up rather than attempted
+   * whole.
+   */
+  RETENTION_BATCH_SIZE: z.coerce.number().int().min(1).max(5_000).default(1_000),
 });
 
 export type Env = z.infer<typeof envSchema>;

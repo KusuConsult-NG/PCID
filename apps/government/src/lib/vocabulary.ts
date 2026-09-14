@@ -61,6 +61,8 @@ const ACTION_LABELS: Record<string, string> = {
   ALERT_REVIEW: 'Reviewed an alert',
   AUDIT_VIEW: 'Searched the audit trail',
   AUDIT_VERIFY: 'Verified the audit chain',
+  RETENTION_VIEW: 'Read the retention schedule',
+  RETENTION_RUN: 'Applied the retention schedule',
   ACCESS_REQUEST_CREATE: 'Requested access',
   ACCESS_REQUEST_APPROVE: 'Decided an access request',
   BREAK_GLASS_INITIATE: 'Used break-glass access',

@@ -5,6 +5,7 @@ import {
   Notice,
   Select,
   SubmitButton,
+  TableScroll,
   TextArea,
 } from '@pcid/portal-kit/components';
 import { formatDateTime, sentenceCase } from '@pcid/portal-kit/format';
@@ -85,7 +86,7 @@ export default async function MissingPersonsPage({
           {listed.records.length === 0 ? (
             <Empty>Nothing here.</Empty>
           ) : (
-            <div className="table-scroll">
+            <TableScroll label="Missing-person enquiries">
               <table>
                 <caption className="visually-hidden">Missing-person enquiries</caption>
                 <thead>
@@ -119,7 +120,7 @@ export default async function MissingPersonsPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </section>
       )}

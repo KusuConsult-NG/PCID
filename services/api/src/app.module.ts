@@ -56,6 +56,10 @@ import { OversightController } from './oversight/oversight.controller';
 import { PcidService } from './identity/pcid.service';
 import { PolicyService } from './policy/policy.service';
 import { RegistrationService } from './identity/registration.service';
+import { RetentionController } from './retention/retention.controller';
+import { RetentionScheduler } from './retention/retention.scheduler';
+import { RetentionService } from './retention/retention.service';
+import { RetentionWorker } from './retention/retention.worker';
 import { SecurityModule } from './security/security.module';
 
 /**
@@ -84,6 +88,7 @@ import { SecurityModule } from './security/security.module';
     IntegrationController,
     NotificationsController,
     DevicesController,
+    RetentionController,
   ],
   providers: [
     ActorService,
@@ -120,6 +125,9 @@ import { SecurityModule } from './security/security.module';
     NotificationWorkerScheduler,
     DevicesService,
     OfflineService,
+    RetentionWorker,
+    RetentionService,
+    RetentionScheduler,
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],

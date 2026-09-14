@@ -218,3 +218,53 @@ export interface NotificationQueue {
     readonly count: number;
   }[];
 }
+
+/**
+ * The retention schedule, as the Data Protection Officer reads it.
+ *
+ * `basis` is on the wire deliberately. A page that shows periods without the
+ * reasons behind them invites somebody to shorten one because it looks long, or
+ * to leave one alone because nobody remembers why it is what it is.
+ */
+export interface RetentionPolicyView {
+  readonly key: string;
+  readonly holds: string;
+  readonly disposition: 'DELETE' | 'REDACT' | 'KEEP';
+  readonly retainDays: number | null;
+  readonly basis: string;
+  readonly redacts: readonly string[];
+  readonly table: string | null;
+  readonly measuredFrom: string | null;
+  readonly due?: number;
+  readonly dueIsAtLeast?: boolean;
+  readonly cutoff?: string;
+}
+
+export interface RetentionErasureView {
+  readonly policy: string;
+  readonly holds: string | null;
+  readonly disposition: string;
+  readonly table: string;
+  readonly cutoff: string;
+  readonly rowsAffected: number;
+  readonly capped: boolean;
+}
+
+export interface RetentionRunView {
+  readonly reference: string;
+  readonly trigger: string;
+  readonly orderedBy: string | null;
+  readonly dryRun: boolean;
+  readonly status: string;
+  readonly rowsAffected: number;
+  readonly moreRemaining: boolean;
+  readonly error: string | null;
+  readonly startedAt: string;
+  readonly finishedAt: string | null;
+  readonly erasures: readonly RetentionErasureView[];
+}
+
+export interface RetentionSchedule {
+  readonly policies: readonly RetentionPolicyView[];
+  readonly lastRun: RetentionRunView | null;
+}

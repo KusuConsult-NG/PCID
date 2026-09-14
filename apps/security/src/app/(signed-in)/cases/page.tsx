@@ -5,6 +5,7 @@ import {
   Notice,
   Select,
   SubmitButton,
+  TableScroll,
   TextArea,
 } from '@pcid/portal-kit/components';
 import { formatDateTime, sentenceCase } from '@pcid/portal-kit/format';
@@ -102,7 +103,7 @@ export default async function CasesPage({
           {listed.cases.length === 0 ? (
             <Empty>Nothing here.</Empty>
           ) : (
-            <div className="table-scroll">
+            <TableScroll label="Cases you are assigned to">
               <table>
                 <caption className="visually-hidden">Cases you are assigned to</caption>
                 <thead>
@@ -134,7 +135,7 @@ export default async function CasesPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </section>
       )}

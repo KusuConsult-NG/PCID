@@ -205,6 +205,8 @@ export const ROLE_DEFINITIONS: readonly RoleDefinition[] = Object.freeze([
       'ALERT_VIEW',
       'ALERT_REVIEW',
       'BREAK_GLASS_REVIEW',
+      'RETENTION_VIEW',
+      'RETENTION_RUN',
     ],
   },
   {

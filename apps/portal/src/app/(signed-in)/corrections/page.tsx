@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { PageHeader } from '@/components/chrome';
-import { Badge, Empty, Notice } from '@pcid/portal-kit/components';
+import { Badge, Empty, Notice, TableScroll } from '@pcid/portal-kit/components';
 import { Field, Select, TextArea } from '@pcid/portal-kit/components';
 import { SubmitButton } from '@pcid/portal-kit/components';
 import { callApi, dataOr } from '@/lib/api';
@@ -80,7 +80,7 @@ export default async function CorrectionsPage({
         {requests.length === 0 ? (
           <Empty>You have not asked for any corrections.</Empty>
         ) : (
-          <div className="table-scroll">
+          <TableScroll label="Correction requests you have submitted">
             <table>
               <caption className="visually-hidden">Correction requests you have submitted</caption>
               <thead>
@@ -111,7 +111,7 @@ export default async function CorrectionsPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </section>
 

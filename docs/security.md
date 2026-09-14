@@ -64,6 +64,21 @@ recording as a finding rather than a fix: a control that exists only in a docume
 is worse than an absent one, because it is counted as present when somebody asks
 what bounds an account.
 
+### The retention schedule was written down and never applied
+
+The same shape again, one phase later, and worth recording as a pattern rather
+than as two incidents. `docs/privacy.md` printed a table of retention periods.
+`citizen.retention_policy` carried a default, and every incident was stamped with
+a `location_retention_until` date on creation. Nothing read any of it and no row
+was ever erased.
+
+Both of these — the general rate ceiling and this — were found by building
+something next to them rather than by reviewing them, which says something about
+where to look for the rest. The test that now holds it is the same shape as the
+one that catches an entitlement with no route behind it: the catalogue and the
+rules are compared in both directions, so a period added with nothing applying it
+fails the build. [retention.md](retention.md) has the whole of it.
+
 ### Sign-in limits count failures, not sign-ins
 
 Sign-ins were once rate limited by network address as well as by account: fifty

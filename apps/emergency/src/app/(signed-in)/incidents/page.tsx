@@ -5,6 +5,7 @@ import {
   Notice,
   Select,
   SubmitButton,
+  TableScroll,
   TextArea,
 } from '@pcid/portal-kit/components';
 import { formatDateTime } from '@pcid/portal-kit/format';
@@ -82,7 +83,7 @@ export default async function IncidentsPage({
           {listed.incidents.length === 0 ? (
             <Empty>Nothing here.</Empty>
           ) : (
-            <div className="table-scroll">
+            <TableScroll label="Incidents">
               <table>
                 <caption className="visually-hidden">Incidents</caption>
                 <thead>
@@ -124,7 +125,7 @@ export default async function IncidentsPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </section>
       )}

@@ -1,4 +1,11 @@
-import { Empty, Field, Notice, Select, SubmitButton } from '@pcid/portal-kit/components';
+import {
+  Empty,
+  Field,
+  Notice,
+  Select,
+  SubmitButton,
+  TableScroll,
+} from '@pcid/portal-kit/components';
 import { formatDate } from '@pcid/portal-kit/format';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -155,7 +162,7 @@ export default async function FindPage({
           {result.data.results.length === 0 ? (
             <Empty>Nobody on the register matches that.</Empty>
           ) : (
-            <div className="table-scroll">
+            <TableScroll label="People matching your search">
               <table>
                 <caption className="visually-hidden">People matching your search</caption>
                 <thead>
@@ -199,7 +206,7 @@ export default async function FindPage({
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </section>
       )}

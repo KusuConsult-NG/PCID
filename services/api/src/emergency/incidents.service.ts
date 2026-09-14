@@ -5,7 +5,7 @@ import type {
   IncidentType,
   LocationSource,
 } from '@pcid/contracts';
-import { ACTIVE_INCIDENT_STATUSES } from '@pcid/contracts';
+import { ACTIVE_INCIDENT_STATUSES, retentionPolicy } from '@pcid/contracts';
 
 import { AuditService } from '../audit/audit.service';
 import { AppError } from '../common/errors';
@@ -46,8 +46,18 @@ export interface CreateIncidentInput {
  */
 @Injectable()
 export class IncidentsService {
-  /** Emergency location material is short-lived unless a case needs it (§69). */
-  private static readonly LOCATION_RETENTION_DAYS = 90;
+  /**
+   * Emergency location material is short-lived unless a case needs it (§69).
+   *
+   * Read from the retention catalogue rather than written here, because this
+   * number is printed in the privacy notice, enforced by the sweep, and shown to
+   * the Data Protection Officer - and a second copy of it in this file is a
+   * second copy that can disagree with the first. The date is stamped on each
+   * incident at creation, so a case that needs the location longer moves its own
+   * date and the sweep honours it.
+   */
+  private static readonly LOCATION_RETENTION_DAYS =
+    retentionPolicy('INCIDENT_STANDARD').retainDays ?? 90;
 
   constructor(
     private readonly db: Database,

@@ -133,6 +133,35 @@ could quietly revise. The table records the outcome and the gateway's reference
 and never the body — the body is on the notification, and copying it here would
 put the same personal information in two places with two retention rules.
 
+### The retention sweep is bounded by privilege, not by care
+
+The schedule erases operational data on a timer, and the property that matters is
+what it cannot reach. `pcid_app` is granted `DELETE` on exactly the tables the
+sweep prunes — `login_attempt`, `user_session`, `credential_verification_token`,
+`notification_delivery_attempt` and `sensitive_action_counter` — and on nothing
+that holds a person, a case or an audit event. A rule written to erase a citizen
+record would fail at the database, where it should.
+
+`offline_release` is the exception that proves the arrangement. Migration 0015
+gave the application `SELECT` and `INSERT` on it and nothing else, so the record
+of what left the platform cannot be removed by the code that writes it; the
+schedule still has to reach it after a year, so it does so through one
+`SECURITY DEFINER` function that erases by the cutoff and nothing else. A grant
+of `DELETE` would have been shorter and would have handed the whole application a
+way to remove the evidence.
+
+`retention_erasure` is append-only by trigger and by privilege, like the audit
+trail and for the same reason: a record of erasures that could itself be edited
+would prove nothing. It holds counts and cutoffs and never row identifiers —
+recording which rows were erased would keep a pointer to every erased subject for
+longer than the data itself was kept.
+
+Redaction leaves a dated mark rather than a blank: `incident.location_erased_at`
+and `notification.content_erased_at`. That makes the rules idempotent without
+comparing contents against a placeholder string, lets each backlog index be
+partial and self-shrinking, and gives the interface a date to show. "Erased on 4
+March under the retention schedule" is an answer; an empty field is not.
+
 ### The audit trail cannot be rewritten, or forked
 
 `audit_event` has triggers refusing `UPDATE`, `DELETE` and `TRUNCATE`, and
@@ -246,7 +275,13 @@ justification and the officer who made it.
 
 **`incident` / `incident_agency` / `incident_officer`** — incident-bound access.
 Every coordinate carries `location_source` and, for incidents,
-`location_retention_until`.
+`location_retention_until` — the date the sweep reads, stamped at creation from
+the retention catalogue, so a case that needs the location longer moves its own
+date rather than changing a policy for everybody.
+
+**`retention_run` / `retention_erasure`** — what the schedule has done. A run and
+its per-policy counts, cutoffs, and whether a rule stopped at its batch. Never
+the contents of what was erased.
 
 **`citizen_account` / `credential` / `credential_verification_token`** — the
 resident's own access. `citizen_account.must_change_password` is set when a

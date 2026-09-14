@@ -184,6 +184,7 @@ _failed_ attempts only.
 | Citizen portal           | `/me/*`                                                     | Own record, credential, contacts, history, security |
 | Oversight                | `/correction-requests/*`, `/alerts/*`                       | Correction and alert review queues                  |
 | Audit                    | `/audit/*`                                                  | Search and chain verification                       |
+| Retention                | `/retention/*`                                              | The schedule, what is overdue, and what was erased  |
 | Analytics                | `/analytics/*`                                              | Aggregates with small-number suppression            |
 | Administration           | `/agencies/*`, `/users/*`                                   | Registry, user administration, your own account     |
 | Integrations             | `/integrations/*`                                           | Data sources and synchronisation                    |
@@ -214,6 +215,31 @@ an unknown release, an expired one and a revoked device all answer the same way,
 because a client that cannot tell them apart still behaves correctly.
 
 See [mobile.md](mobile.md) for the limits and why they are those.
+
+## The retention schedule is readable, and applying it is a decision
+
+`GET /retention/schedule` returns every policy with its period, what happens when
+the period ends, the reason that period was chosen, and how many rows are past it
+right now. The backlog is on the same response as the schedule because they
+answer one question: the schedule says what should happen and the backlog says
+whether it is happening, and for eleven phases this platform could answer only
+the first.
+
+Counts are bounded — past a ceiling the response says "at least", because a page
+that counted nine million spent sessions to render a number is a page nobody
+opens.
+
+`POST /retention/runs` applies it. `dryRun` defaults to **true**: a form that
+erases by omission is a form somebody will submit by accident, and this is the
+one operation in the platform with nothing to undo it. Step-up authenticated for
+the same reason. Each policy is bounded to a batch, and a response carrying
+`moreRemaining` means exactly that — the next run continues.
+
+`GET /retention/runs` is the ledger: per run, per policy, the cutoff and the
+count. Never the contents, and never row identifiers.
+
+Both actions are held by the Data Protection Officer and nobody else, including
+no platform administrator. See [retention.md](retention.md).
 
 ## The citizen credential is a code, not a record
 

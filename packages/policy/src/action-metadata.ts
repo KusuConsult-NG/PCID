@@ -127,6 +127,14 @@ export const ACTION_PURPOSES: Readonly<Record<Action, readonly Purpose[]>> = Obj
   AUDIT_VERIFY: ['AUDIT_REVIEW'],
   ALERT_VIEW: ['IDENTITY_INTEGRITY_REVIEW', 'AUDIT_REVIEW', ...EMERGENCY, ...INVESTIGATION],
   ALERT_REVIEW: ['IDENTITY_INTEGRITY_REVIEW', 'AUDIT_REVIEW'],
+  // Retention is an oversight function, not a technical one: applying the
+  // schedule is how the platform discharges storage limitation, and the person
+  // answerable for that is the Data Protection Officer. It shares the oversight
+  // purpose with the audit trail because it is read in the same place and for
+  // the same reason - and deliberately not SYSTEM_ADMINISTRATION, which would
+  // put erasure in the hands of whoever administers the servers (§7).
+  RETENTION_VIEW: ['AUDIT_REVIEW'],
+  RETENTION_RUN: ['AUDIT_REVIEW'],
   ANALYTICS_VIEW: ['STATISTICAL_ANALYSIS', ...EMERGENCY],
 
   ADMIN_AGENCY_MANAGE: ADMIN,
@@ -277,6 +285,7 @@ export const MUTATING_ACTIONS: ReadonlySet<Action> = new Set<Action>([
   'BREAK_GLASS_INITIATE',
   'BREAK_GLASS_REVIEW',
   'ALERT_REVIEW',
+  'RETENTION_RUN',
   'ADMIN_AGENCY_MANAGE',
   'ADMIN_USER_MANAGE',
   'ADMIN_ROLE_MANAGE',
@@ -388,6 +397,8 @@ export const ACTION_RESOURCE_TYPES: Readonly<Record<Action, readonly ResourceTyp
     AUDIT_VERIFY: ['AUDIT_EVENT'],
     ALERT_VIEW: ['ALERT'],
     ALERT_REVIEW: ['ALERT'],
+    RETENTION_VIEW: ['SYSTEM'],
+    RETENTION_RUN: ['SYSTEM'],
     ANALYTICS_VIEW: ['ANALYTICS_AGGREGATE'],
 
     ADMIN_AGENCY_MANAGE: ['AGENCY'],

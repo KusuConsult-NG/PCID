@@ -10,8 +10,8 @@
           ┌─────────────┴──────────────┐
    Citizen portal              API instance
    Government portal           API instance          (stateless, ≥2 each)
-   Security agency portal      Notification worker
-   Emergency response portal   (≥1, no HTTP surface)
+   Security agency portal      Notification worker   (≥1, no HTTP surface)
+   Emergency response portal   Retention sweep       (1, nightly)
           └─────────────┬──────────────┘
                         │
         ┌───────────────┼────────────────┐
@@ -235,6 +235,36 @@ Watch two things: the depth of `QUEUED`, and the count of `FAILED`. The
 administration page in the government portal shows both, grouped by cause, along
 with the oldest message still waiting.
 
+## The retention sweep
+
+The schedule that erases what is past its period runs as its own process too:
+
+```bash
+npm run worker:retention          # nightly, on a timer
+npm run worker:retention -- --once  # one sweep, for a cron entry or a first run
+```
+
+Same image, different command. A single-box deployment can set
+`RETENTION_WORKER_ENABLED=true` instead and let the API sweep on a timer.
+
+**Run it somewhere.** Off everywhere means the schedule is not applied, which is
+exactly the state this platform was in for eleven phases, and which the privacy
+notice describes as something the platform does. The Retention page in the
+government portal says "Never applied" in red until a sweep has run, so the
+condition is visible to the Data Protection Officer rather than only in a config
+file.
+
+**Do a dry run first on a deployment carrying existing data.** The first live
+sweep on a system that has been collecting for a year meets a year of rows, and
+the counts it reports should be the ones you expected. Each policy is bounded to
+`RETENTION_BATCH_SIZE` rows per run, so a large backlog is worked off over
+several runs rather than in one statement that would take a timeout with it —
+raise the batch, or run `--once` repeatedly, to work through it faster.
+
+Nightly is the default because the periods are measured in days. An hourly sweep
+erases the same rows a few hours earlier at the cost of a write burst against
+tables that are busy all day.
+
 ## Health checks
 
 | Endpoint               | Use                                                                                    |
@@ -307,6 +337,11 @@ Deliberately not a formality:
       is the correct failure
 - [ ] A gateway is configured for every channel in use, and a test message arrived
 - [ ] At least one notification worker is running, and the queue depth is on a dashboard
+- [ ] The retention sweep is running somewhere — its own process or
+      `RETENTION_WORKER_ENABLED=true` — and the Retention page shows a run that
+      is not "never". A schedule nothing applies is a claim made to a regulator
+- [ ] A dry run has been done first on a deployment carrying existing data, and
+      the counts it reported were the ones expected
 - [ ] `shared_buffers`, `work_mem` and `log_min_duration_statement` set as above
 - [ ] `VACUUM (FULL, ANALYZE) audit_chain_head` run once, in a maintenance window
 - [ ] Load testing performed on **this deployment's** hardware, not only in CI

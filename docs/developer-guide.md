@@ -109,6 +109,13 @@ case, and that a technical role carries no entitlement to citizen data at all.
 the journeys created: an empty table hides most of the mistakes a populated one
 makes.
 
+That last point has teeth. The scrollable-table defect fixed in phase 12 had been
+in every portal since the first one, and the suite was green throughout: axe
+raises `scrollable-region-focusable` only when the content actually overflows at
+the viewport being tested, and until a wide enough table was added, none did. A
+passing accessibility suite means the violations it could see are absent, not
+that the pattern is sound.
+
 Chromium has to be present: `npx playwright install chromium`. Playwright is
 pinned exactly, because a minor bump expects a different browser revision than the
 CI image carries.
@@ -169,6 +176,38 @@ browser's HTTP cache is neither encrypted, bounded in time, nor revocable.
 When the worker changes, bump `VERSION` in it. The activate handler deletes every
 cache that is not the current one, which is what stops a stale shell surviving a
 deploy.
+
+### Adding something the platform keeps
+
+Two questions, and the second is the one that gets forgotten. How long should it
+be kept, and what applies that?
+
+Add the policy to
+[`packages/contracts/src/retention.ts`](../packages/contracts/src/retention.ts)
+with a stated basis, and a rule in
+[`retention.rules.ts`](../services/api/src/retention/retention.rules.ts) that
+implements it. `retention-coverage.test.ts` compares the two in both directions,
+so a policy with nothing behind it fails the build — which is precisely the
+defect this platform shipped for eleven phases, and the reason it is a test
+rather than a review step.
+
+A rule takes its cutoff as `$1` and a row limit as `$2`, touches one table, and
+never a table holding a person, a case or an audit event. If the period should be
+applied at write time instead — because a particular record may need longer than
+the default — stamp a date on the row and mark the rule `cutoff: 'DUE_DATE'`, as
+`incident.location_retention_until` does.
+
+If the answer is "for ever", say so as a `KEEP` policy with the reason. A
+schedule listing only the things that expire reads as though the rest was
+forgotten rather than decided.
+
+### A table that might not fit
+
+Wrap it in `TableScroll` from `@pcid/portal-kit/components`, never a bare
+`<div className="table-scroll">`. The bare div scrolls for a pointer and not for
+a keyboard, which is a WCAG failure that only fires when the content actually
+overflows at the tested width — so twenty-two of them sat unnoticed until one new
+table was wide enough to be caught.
 
 ### The TOTP wrinkle
 

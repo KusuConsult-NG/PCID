@@ -605,3 +605,15 @@ export const citizenReportSchema = z.object({
   description: z.string().min(10).max(4000),
   accessReference: z.string().max(128).nullish(),
 });
+
+/* --- Retention (§21, §68) -------------------------------------------------- */
+
+export const retentionRunSchema = z.object({
+  /**
+   * Defaults to a dry run, and that is the safe default rather than the timid
+   * one: a form that erases by omission is a form somebody will submit by
+   * accident, and this is the one operation in the platform with nothing to undo
+   * it. Erasing is a deliberate `false`.
+   */
+  dryRun: z.boolean().default(true),
+});

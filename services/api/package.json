@@ -21,7 +21,8 @@
     "load:run": "node --import tsx src/load/load-test-cli.ts",
     "load:probe": "node --import tsx src/load/load-probe-cli.ts",
     "worker:notifications": "node dist/notifications/notification-worker-cli.js",
-    "dev:worker": "node --import tsx src/notifications/notification-worker-cli.ts"
+    "dev:worker": "node --import tsx src/notifications/notification-worker-cli.ts",
+    "worker:retention": "node --import tsx src/retention/retention-worker-cli.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",

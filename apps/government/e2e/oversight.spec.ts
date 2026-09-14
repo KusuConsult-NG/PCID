@@ -111,3 +111,66 @@ test('an approved correction is visible to the resident, with the reason', async
   // would tell them the thresholds.
   expect(accesses.some((entry) => entry.action === 'ALERT_REVIEW')).toBe(false);
 });
+
+/**
+ * Retention: the schedule, and whether it is being kept.
+ *
+ * Read from the Data Protection Officer's side, because they are the person who
+ * holds both retention actions - applying a retention schedule is how the
+ * platform discharges storage limitation, and §7 is explicit that administering
+ * the servers confers no entitlement over citizen data.
+ *
+ * The journey is the one a DPO would actually take on their first day: read what
+ * the platform keeps and why, count what is overdue without touching anything,
+ * then apply the schedule and see what it took.
+ */
+test('the schedule says what is kept, for how long, and why', async ({ page }) => {
+  await page.goto('/retention');
+  await expect(page.getByRole('heading', { name: 'Retention', level: 1 })).toBeVisible();
+
+  const schedule = page.getByRole('table');
+  await expect(schedule).toBeVisible();
+
+  // The things that must never be swept are on the same table as the things that
+  // are. A schedule listing only what expires reads as though the rest was
+  // forgotten rather than decided.
+  await expect(schedule.getByText('Kept', { exact: true }).first()).toBeVisible();
+  await expect(schedule.getByText(/statutory identity register/)).toBeVisible();
+  await expect(schedule.getByText(/hash chain|break the chain/)).toBeVisible();
+
+  // Every period carries its reason, in front of the reader rather than behind a
+  // link: somebody deciding whether ninety days is right needs the reason, or
+  // they will judge it by whether the number looks large.
+  await expect(schedule.getByText(/Ninety days is the window/)).toBeVisible();
+});
+
+test('counting what is due erases nothing, and applying it says what it took', async ({ page }) => {
+  await page.goto('/retention');
+
+  await page.getByRole('button', { name: 'Count what is due' }).click();
+  await expect(page.getByText('Counted, and nothing was erased')).toBeVisible();
+
+  // The count is a dry run on the record like any other run, and is labelled as
+  // one: a ledger where a count and an erasure look alike is a ledger nobody can
+  // read afterwards.
+  await expect(page.getByText('Counted only').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Apply the schedule now' }).click();
+  await expect(page.getByText('The schedule was applied')).toBeVisible();
+
+  // And what it did is on the page, per policy, in counts.
+  const runs = page.getByRole('heading', { name: 'What has been erased' });
+  await expect(runs).toBeVisible();
+  await expect(page.getByText(/Counts and cutoffs, never contents/)).toBeVisible();
+});
+
+test('the sweep is in the audit trail, like every other decision', async ({ page }) => {
+  await page.goto('/audit?action=RETENTION_RUN');
+  await expect(page.getByRole('heading', { name: 'Audit trail', level: 1 })).toBeVisible();
+
+  // Scoped to the results table rather than the page: "Retention" is also the
+  // name of a navigation link, and an assertion that matched that would pass
+  // whether or not the sweep was ever recorded.
+  const results = page.getByRole('table');
+  await expect(results.getByText('Applied the retention schedule').first()).toBeVisible();
+});

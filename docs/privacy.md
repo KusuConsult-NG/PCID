@@ -44,17 +44,30 @@ system at all.
 Every dataset carries a retention policy, and emergency location material carries
 an explicit retention date set when the record is created.
 
-| Data                        | Policy                                                      |
-| --------------------------- | ----------------------------------------------------------- |
-| Citizen identity            | Long-term government record, per applicable law             |
-| Incident records            | Configured retention, default 90 days for location material |
-| Security case records       | Configured legal retention                                  |
-| Audit events                | Long-term, tamper-resistant                                 |
-| Sessions and login attempts | Short, operational                                          |
-| Emergency location          | 90 days unless a case requires longer                       |
+| Data                  | Policy                                                    |
+| --------------------- | --------------------------------------------------------- |
+| Citizen identity      | Long-term government record, per applicable law           |
+| Incident records      | Kept; location material erased after 90 days              |
+| Security case records | Configured legal retention, disposed of by the agency     |
+| Audit events          | Long-term, tamper-resistant, never swept                  |
+| Sessions              | 30 days past expiry, then deleted                         |
+| Sign-in attempts      | 90 days, then deleted                                     |
+| Notification content  | 90 days, then erased; the record that it was sent remains |
+| Emergency location    | 90 days unless the incident's own date says longer        |
 
-Enforcement jobs for the shorter schedules are not yet implemented; the columns
-and policies are in place and the retention dates are set on write.
+**And they are applied.** Until this phase they were not: the columns carried
+the policies, the retention dates were set on write, and no code read any of it.
+A schedule that nothing applies is a claim rather than a control, and it is worse
+than an absent control because it is counted as present by everyone who reads it
+— including the person compiling the assessment below.
+
+There is now a sweep that applies the catalogue nightly, a ledger of what each
+run erased, and a page in the government portal where the Data Protection Officer
+can see what is overdue, order the schedule applied, and read what it took. It
+cannot reach the register, the case files or the audit trail: the catalogue marks
+those kept, the rules exclude them, and the database refuses the deletion
+regardless. [retention.md](retention.md) sets out the whole of it, including what
+is still not done.
 
 ### Integrity and confidentiality
 

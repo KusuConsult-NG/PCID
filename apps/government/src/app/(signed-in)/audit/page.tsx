@@ -1,4 +1,11 @@
-import { Badge, Empty, Field, Notice, SubmitButton } from '@pcid/portal-kit/components';
+import {
+  Badge,
+  Empty,
+  Field,
+  Notice,
+  SubmitButton,
+  TableScroll,
+} from '@pcid/portal-kit/components';
 import { formatDateTime, sentenceCase } from '@pcid/portal-kit/format';
 import type { Metadata } from 'next';
 
@@ -141,7 +148,7 @@ export default async function AuditPage({
           {found.events.length === 0 ? (
             <Empty>Nothing matches that.</Empty>
           ) : (
-            <div className="table-scroll">
+            <TableScroll label="Audit records matching your search, most recent first">
               <table>
                 <caption className="visually-hidden">
                   Audit records matching your search, most recent first
@@ -205,7 +212,7 @@ export default async function AuditPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </section>
       )}

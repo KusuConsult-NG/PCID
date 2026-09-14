@@ -105,6 +105,38 @@ services:
     security_opt: ['no-new-privileges:true']
     cap_drop: ['ALL']
 
+  # The retention sweep: the same image again, applying the schedule nightly.
+  #
+  # It is here rather than left to an operator's cron because "nobody ran it" is
+  # the failure this whole phase exists to fix - the periods were in the privacy
+  # notice for eleven phases and nothing applied them. A compose file that starts
+  # the API and the notification worker but leaves the schedule to be remembered
+  # would be making the same mistake in a different place.
+  retention-worker:
+    build: .
+    command: ['node', 'services/api/dist/retention/retention-worker-cli.js']
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://pcid:pcid-local-development@postgres:5432/pcid
+      DATABASE_SSL: require
+      TOKEN_SIGNING_KEY: ${TOKEN_SIGNING_KEY:?set TOKEN_SIGNING_KEY}
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:?set SECRET_ENCRYPTION_KEY}
+      ALLOW_SANDBOX_ADAPTERS: 'false'
+      # Nightly: the periods are measured in days, and an hourly sweep buys hours
+      # at the cost of a write burst against tables that are busy all day.
+      RETENTION_WORKER_INTERVAL_SECONDS: 86400
+      # Below the catalogue ceiling, so a first sweep against an existing backlog
+      # is worked off over several runs rather than attempted in one statement.
+      RETENTION_BATCH_SIZE: 1000
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    read_only: true
+    tmpfs: ['/tmp']
+    security_opt: ['no-new-privileges:true']
+    cap_drop: ['ALL']
+
   portal:
     build:
       context: .

@@ -40,6 +40,7 @@ const SECTIONS: readonly {
     actions: ['ACCESS_REQUEST_CREATE', 'ACCESS_REQUEST_APPROVE'],
   },
   { href: '/audit', label: 'Audit trail', actions: ['AUDIT_VIEW'] },
+  { href: '/retention', label: 'Retention', actions: ['RETENTION_VIEW'] },
   {
     href: '/administration',
     label: 'Administration',

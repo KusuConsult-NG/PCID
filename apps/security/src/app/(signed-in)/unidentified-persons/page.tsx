@@ -5,6 +5,7 @@ import {
   Notice,
   Select,
   SubmitButton,
+  TableScroll,
   TextArea,
 } from '@pcid/portal-kit/components';
 import { formatDateTime, sentenceCase } from '@pcid/portal-kit/format';
@@ -92,7 +93,7 @@ export default async function UnidentifiedPersonsPage({
           {listed.records.length === 0 ? (
             <Empty>Nothing here.</Empty>
           ) : (
-            <div className="table-scroll">
+            <TableScroll label="Unidentified-person records">
               <table>
                 <caption className="visually-hidden">Unidentified-person records</caption>
                 <thead>
@@ -136,7 +137,7 @@ export default async function UnidentifiedPersonsPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </section>
       )}
