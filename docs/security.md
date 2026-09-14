@@ -50,6 +50,22 @@ address at all. Most of what follows exists because of it.
   response for every failed attempt — wrong password, unknown account and locked
   account are indistinguishable to the caller.
 
+### Sign-in limits count failures, not sign-ins
+
+Sign-ins were once rate limited by network address as well as by account: fifty
+attempts per address per fifteen minutes. Load testing found what that means in a
+building. A ministry's staff share one public address behind their gateway, so
+the fifty-first person to arrive for the morning shift would have been refused —
+not because anything was wrong with their account, but because fifty colleagues
+had already signed in correctly. The symptom, "the system says too many sign-in
+attempts", would have been blamed on the account rather than the gateway.
+
+The address budget now counts **failed** sign-ins. That keeps what the control was
+for: credential stuffing from one source is a stream of failures and still trips
+it, while a shift change is a stream of successes and does not. Brute force
+against one account is bounded separately, by a per-account budget that no shared
+address affects, and by the account lockout behind it.
+
 ## Sessions and tokens
 
 - Access tokens are a minimal JWS with **one algorithm and no negotiation**: the
@@ -365,6 +381,21 @@ prove the seven propositions of §75 at the engine and at the HTTP boundary.
 same for the portal in a real browser, against the standalone build the container
 runs.
 
+## Searching is bounded, and that is a control
+
+A search of the register that matches more than a thousand people is refused,
+with the response saying what to add. It reads as a performance measure and it is
+one — ordering a quarter of a million people to show twenty is work proportional
+to the register, and any officer could ask for it. But the reason it is in this
+document is that a surname against a register of four million is not an
+identification, and paging through the result is browsing the register. The
+platform has no bulk export and no browse-all view by design; an unbounded name
+search was the hole in that.
+
+The per-account ceiling (twenty searches a minute) and the rolling volume alert
+still apply on top. This bounds the size of a single answer; those bound how many
+answers an account may ask for.
+
 ## Not covered yet
 
 Stated plainly, because a security document that only lists strengths is not one:
@@ -372,8 +403,11 @@ Stated plainly, because a security document that only lists strengths is not one
 - **No independent security assessment or penetration test has been performed.**
   The tests here are written by the same process that wrote the code, which is
   necessary but not sufficient.
-- **No load testing** against statewide volumes. The rate limits and pool sizes
-  are reasoned defaults, not measured ones.
+- **Load testing is done but not on production hardware.**
+  [load-testing.md](load-testing.md) records a four-million-record run and the
+  five defects it found. What it could not establish is capacity on the hardware
+  the state will buy: everything there shared four cores with the load generator.
+  The rate limits are now measured rather than reasoned; the pool sizes are not.
 - **Signed audit exports** are not implemented; the chain is verifiable in place
   but there is no externally anchored proof.
 - **API client authentication** is modelled (`api_client`, scopes, IP ranges) but

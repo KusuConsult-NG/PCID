@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { Purpose } from '@pcid/contracts';
 import type { PolicyResource } from '@pcid/policy';
 
 import { AppError } from '../common/errors';
+import { ENV } from '../config/config.module';
+import type { Env } from '../config/env';
 import type { RequestContext } from '../common/correlation';
 import { project, withheld } from '../common/projection';
 import { Database } from '../database/pool';
@@ -53,6 +55,7 @@ export class CitizensService {
     private readonly db: Database,
     private readonly policy: PolicyService,
     private readonly pcid: PcidService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   async search(
@@ -107,7 +110,11 @@ export class CitizensService {
     if (criteria.phone !== undefined) {
       where.add('(phone_primary = ? OR phone_secondary = ?)', criteria.phone, criteria.phone);
     }
-    if (criteria.name !== undefined) where.add('display_name % ?', criteria.name);
+    let nameParameter: number | null = null;
+    if (criteria.name !== undefined) {
+      nameParameter = where.next();
+      where.add('display_name % ?', criteria.name);
+    }
     if (criteria.dateOfBirth !== undefined)
       where.add('date_of_birth = ?::date', criteria.dateOfBirth);
     if (criteria.lgaCode !== undefined) where.add('lga_code = ?', criteria.lgaCode);
@@ -125,14 +132,72 @@ export class CitizensService {
       where.add('pcid = ?', actor.subject.subjectPcid);
     }
 
+    // Count before reading, and count only as far as it matters.
+    //
+    // Counting every match cost as much as the search itself - 2.6 seconds
+    // against a four-million-record register - and told the officer nothing they
+    // could use. Stopping at the cap costs tens of milliseconds, because the
+    // scan stops as soon as it has found that many.
+    const totalRow = await this.db.queryOne<{ count: string }>(
+      `SELECT count(*)::text AS count
+         FROM (SELECT 1 FROM citizen ${where.sql} LIMIT $${where.next()}) AS bounded`,
+      where.withExtra(this.env.SEARCH_MAX_RESULTS + 1),
+    );
+    const counted = Number(totalRow?.count ?? 0);
+
+    // A search that matches more people than anybody could look through is
+    // refused rather than paged.
+    //
+    // Partly cost: ordering a quarter of a million people to show twenty is work
+    // proportional to the register, and any officer could ask for it. Mostly
+    // though it is the right answer. A surname against a statewide register is
+    // not an identification, and paging through the result is browsing the
+    // register - which is the thing this platform exists not to allow (§63). The
+    // refusal says what to add, because the officer standing at the counter has
+    // the person in front of them and can ask.
+    if (counted > this.env.SEARCH_MAX_RESULTS) {
+      throw AppError.validation(
+        `More than ${this.env.SEARCH_MAX_RESULTS} people match that search. Add the date ` +
+          'of birth or a telephone number, or search by Plateau Citizen ID.',
+        [
+          {
+            path: 'query',
+            // Only what actually narrows a register of four million. A Local
+            // Government Area sounds like it would and does not: a name matches
+            // a hundred thousand people and the largest LGA holds several
+            // hundred thousand, so the two together are still far too many.
+            message:
+              'Add the date of birth or a telephone number, or search by Plateau Citizen ID.',
+          },
+        ],
+      );
+    }
+
+    // Closest first, not alphabetically first.
+    //
+    // `ORDER BY display_name` had to sort every matching row before it could
+    // return twenty, and there could be a quarter of a million of them. The
+    // refusal above is what makes this cheap: there are at most a thousand rows
+    // left to order by the time we get here, and sorting a thousand rows by
+    // trigram distance costs nothing.
+    //
+    // A trigram index to answer the ordering from was tried and removed (0014).
+    // It was chosen by the planner for a BitmapAnd against the date-of-birth
+    // index, where it narrowed nothing and cost a second - on about one search
+    // in twelve, unreproducibly, because which plan you get depends on the name
+    // you typed.
+    //
+    // It is also the better answer. An officer searching "Amina Dung" wants the
+    // closest matches, not the twenty whose names happen to begin with A.
+    const ordering =
+      nameParameter === null
+        ? 'ORDER BY display_name'
+        : `ORDER BY display_name <-> $${nameParameter}`;
+
     const rows = await this.db.query<CitizenRow>(
       `SELECT ${CITIZEN_COLUMNS} FROM citizen ${where.sql}
-        ORDER BY display_name LIMIT $${where.next()} OFFSET $${where.next(2)}`,
+        ${ordering} LIMIT $${where.next()} OFFSET $${where.next(2)}`,
       where.withExtra(criteria.limit, criteria.offset),
-    );
-    const totalRow = await this.db.queryOne<{ count: string }>(
-      `SELECT count(*)::text AS count FROM citizen ${where.sql}`,
-      where.params,
     );
 
     return {
@@ -140,7 +205,7 @@ export class CitizensService {
         data: project(outcome.decision, citizenFieldValues(row)),
         restrictedFields: withheld(outcome.decision),
       })),
-      total: Number(totalRow?.count ?? 0),
+      total: counted,
     };
   }
 

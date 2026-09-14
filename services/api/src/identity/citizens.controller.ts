@@ -32,7 +32,10 @@ documentRoute({
   description:
     'Returns a deliberately thin projection - enough to confirm you have the right person, and ' +
     'nothing more. A full record is obtained by viewing it under a stated authority. Searches are ' +
-    'rate limited per account and an unusual volume raises a security alert for review.',
+    'rate limited per account and an unusual volume raises a security alert for review. ' +
+    'Results are ordered by how closely the name matches, not alphabetically. A search matching ' +
+    'more than a thousand people is refused rather than paged: against a register of several ' +
+    'million a name alone is not an identification, and the response says what to add.',
   parameters: [
     {
       name: 'purpose',

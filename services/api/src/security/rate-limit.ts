@@ -141,15 +141,22 @@ export class RateLimiter implements OnModuleDestroy {
    * Consume one unit against `key`. Fails *closed* only for the sensitive
    * limiters; the general limiter fails open on a store outage so a Redis
    * incident cannot take emergency response offline.
+   *
+   * `amount: 0` reads the budget without spending from it, which is how a
+   * limiter that counts failures is checked before the outcome is known.
    */
   async consume(
     key: string,
     max: number,
     windowSeconds: number = this.env.RATE_LIMIT_WINDOW_SECONDS,
-    options: { failClosed?: boolean } = {},
+    options: { failClosed?: boolean; amount?: number } = {},
   ): Promise<RateLimitDecision> {
     try {
-      const { count, resetAtMs } = await this.store.increment(key, windowSeconds);
+      const { count, resetAtMs } = await this.store.increment(
+        key,
+        windowSeconds,
+        options.amount ?? 1,
+      );
       return { allowed: count <= max, remaining: Math.max(0, max - count), resetAtMs, count };
     } catch (error) {
       logger.error('rate_limit_store_unavailable', {

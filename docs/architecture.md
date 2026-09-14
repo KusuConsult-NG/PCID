@@ -405,7 +405,9 @@ hours.
 **PostgreSQL** for everything, including the audit chain. Constraints, triggers
 and privileges let the most important guarantees hold _below_ the application, so
 a bug in a service cannot violate them. `pg_trgm` provides name matching without a
-separate search cluster at this scale; PostGIS is used for the command map where
+separate search cluster at this scale — with a GiST index for ordering by
+closeness, because at four million records sorting every match alphabetically to
+show twenty read the whole register; PostGIS is used for the command map where
 available, and the schema works without it.
 
 **Node.js and TypeScript** across the stack, with a strict compiler. The
@@ -438,6 +440,17 @@ errors.
 Nothing about the design assumes a single machine, and the container carries no
 local state, so a move to Kubernetes is a deployment change rather than a redesign.
 
+**One thing does not scale horizontally, and it is deliberate.** Every audited
+operation extends the hash chain under a lock on a single row, so the platform's
+audited write rate has one number — measured at about 1,300 a second — and adding
+API instances does not raise it. At the state's expected concurrency that leaves
+roughly a six-fold margin; what would consume it is a bulk import or an
+integration sync that audits per record rather than per batch.
+[load-testing.md](load-testing.md) sets out the measurement and what to do if the
+margin ever looks thin. The answer is not to weaken the chain: an identity
+platform that cannot say for certain whether its own log has been altered has
+nothing else worth optimising.
+
 ## What is not built yet
 
 The API and the four portals are the surface today. Still to build:
@@ -445,8 +458,12 @@ The API and the four portals are the surface today. Still to build:
 - **Mobile applications** for citizens, field officers and responders, including
   the controlled offline mode described in §56 — encrypted, expiring,
   device-bound, minimal, revocable, and never a copy of the registry.
-- **Load testing** against statewide volumes, and an independent security
-  assessment. Neither can be self-certified, and neither has been done.
+- **An independent security assessment.** It cannot be self-certified, and it has
+  not been done.
 
-Until those are complete the platform is not ready for a pilot, whatever the test
-suite says.
+Load testing against statewide volumes is done: [load-testing.md](load-testing.md)
+records what was measured, the five defects it found, and — set out at the end —
+what it does not establish, chief among which is capacity on production hardware.
+
+Until the remaining two are complete the platform is not ready for a pilot,
+whatever the test suite says.

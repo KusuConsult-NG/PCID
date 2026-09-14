@@ -542,6 +542,11 @@ export class AuthService {
     return false;
   }
 
+  /** The key the per-address budget is kept under. Failures only - see below. */
+  private static loginFailureKey(context: RequestContext): string {
+    return `login-ip-failures:${context.ipAddress ?? 'unknown'}`;
+  }
+
   private async enforceLoginRateLimit(identifier: string, context: RequestContext): Promise<void> {
     const byIdentifier = await this.limiter.consume(
       `login:${identifier.toLowerCase()}`,
@@ -549,13 +554,28 @@ export class AuthService {
       this.env.LOGIN_LOCKOUT_SECONDS,
       { failClosed: true },
     );
-    const byIp = await this.limiter.consume(
-      `login-ip:${context.ipAddress ?? 'unknown'}`,
+    // The address budget counts *failed* sign-ins, and is read here without
+    // being spent.
+    //
+    // It used to count attempts, and that broke the moment it met a real office.
+    // A ministry's staff share one public address behind their gateway, so the
+    // fifty-first person to arrive for the morning shift was refused - not
+    // because anything was wrong with their account, but because fifty
+    // colleagues had already signed in correctly. Load testing found it at two
+    // hundred and eighty accounts; a busy registry would have found it on the
+    // first morning.
+    //
+    // Counting failures keeps what the control was for. Credential stuffing from
+    // one source is a stream of failures and still trips it; a shift change is a
+    // stream of successes and does not. Per-account brute force is bounded
+    // separately, by `byIdentifier` above, which no shared address affects.
+    const byAddress = await this.limiter.consume(
+      AuthService.loginFailureKey(context),
       this.env.LOGIN_MAX_FAILURES * 10,
       this.env.LOGIN_LOCKOUT_SECONDS,
-      { failClosed: true },
+      { failClosed: true, amount: 0 },
     );
-    if (!byIdentifier.allowed || !byIp.allowed) {
+    if (!byIdentifier.allowed || !byAddress.allowed) {
       throw new AppError('RATE_LIMITED', 'Too many sign-in attempts. Try again later.');
     }
   }
@@ -571,6 +591,12 @@ export class AuthService {
       `INSERT INTO login_attempt (identifier, actor_type, succeeded, failure_code, ip_address, user_agent)
        VALUES ($1, $2, false, $3, $4, $5)`,
       [identifier, actorType, failureCode, context.ipAddress, context.userAgent],
+    );
+    // This is where the address budget is spent: on the failure, not on the try.
+    await this.limiter.consume(
+      AuthService.loginFailureKey(context),
+      this.env.LOGIN_MAX_FAILURES * 10,
+      this.env.LOGIN_LOCKOUT_SECONDS,
     );
     if (userId !== null) {
       const table = actorType === 'GOVERNMENT_USER' ? 'government_user' : 'citizen_account';

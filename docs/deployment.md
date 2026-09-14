@@ -98,6 +98,44 @@ The cluster should run with `--data-checksums`, encryption at rest, automated
 backups, point-in-time recovery, and a standby. Connections should be restricted
 to the API's security group.
 
+### Settings that are not the defaults
+
+A packaged PostgreSQL ships a configuration sized for a laptop, and the register
+is a multi-gigabyte table read at random.
+
+| Setting                      | Suggested                        | Why                                                                        |
+| ---------------------------- | -------------------------------- | -------------------------------------------------------------------------- |
+| `shared_buffers`             | 25% of RAM                       | The stock 128MB against a register of several gigabytes                    |
+| `effective_cache_size`       | 60-75% of RAM                    | Tells the planner an index scan is affordable                              |
+| `work_mem`                   | 16-64MB                          | Sized against `max_connections`; the stock 4MB spills modest sorts to disk |
+| `max_connections`            | Pool size × instances + headroom | The API pools; the database should not also be a pool                      |
+| `log_min_duration_statement` | `500`                            | A statement over half a second on these access paths is a defect, not load |
+
+`log_min_duration_statement` is the one that pays for itself. Every defect load
+testing found showed up in that log first.
+
+### Two things an existing deployment must do once
+
+Migration `0014` gives `audit_chain_head` its own vacuum settings, but it does not
+reclaim what has already accumulated: three million audit events had left that
+one row occupying 32MB, and `VACUUM FULL` on it takes an `ACCESS EXCLUSIVE` lock,
+which stops every audited operation in the platform — which is to say all of
+them. Run it in a maintenance window:
+
+```sql
+VACUUM (FULL, ANALYZE) audit_chain_head;   -- seconds, but it blocks everything
+```
+
+And verify the audit chain in ranges rather than in one statement. A full walk of
+three million links takes about thirty-six seconds and will hit the statement
+timeout; fifty thousand links take under a second:
+
+```sql
+SELECT max(seq) FROM audit_event;                 -- then walk it in blocks
+SELECT * FROM verify_audit_chain(1, 50000);
+SELECT * FROM verify_audit_chain(50001, 100000);
+```
+
 ## Rollout
 
 ```bash
@@ -252,8 +290,15 @@ Deliberately not a formality:
 - [ ] Every portal served over TLS, so their session cookies are accepted as `Secure`
 - [ ] A gateway is configured for every channel in use, and a test message arrived
 - [ ] At least one notification worker is running, and the queue depth is on a dashboard
-- [ ] Load testing performed — **not yet done**
+- [ ] `shared_buffers`, `work_mem` and `log_min_duration_statement` set as above
+- [ ] `VACUUM (FULL, ANALYZE) audit_chain_head` run once, in a maintenance window
+- [ ] Load testing performed on **this deployment's** hardware, not only in CI
 - [ ] Independent security assessment performed — **not yet done**
 
-The last two are open. The platform should not carry live citizen data until they
-are closed.
+Load testing against a statewide register is done and is recorded in
+[load-testing.md](load-testing.md) — including five defects it found and what it
+does not establish. What it does not establish is capacity on the hardware the
+state actually buys, which is why that line stays on this list.
+
+The security assessment is open. The platform should not carry live citizen data
+until it is closed.

@@ -69,6 +69,7 @@ npm run test:integration --workspace services/api    # the API against a real da
 npm run test:e2e                                     # every portal, in a real browser
 npm run worker:notifications                         # the delivery worker, standalone
 npm run verify                                       # format, lint, typecheck, unit + integration
+npm run load:probe                                   # the hot queries' plans at volume
 ```
 
 `verify` deliberately leaves the end-to-end suite out: it needs a browser, and it
@@ -116,6 +117,35 @@ Two things are deliberate and worth not "fixing". Nothing is stubbed, so a failu
 usually means the platform refused something rather than that a selector moved.
 And the portal is built and run the way the container runs it — the standalone
 server, not `next start` — so the suite exercises the artefact that ships.
+
+### Measuring against a statewide register
+
+The tests above run on a handful of records, which is where the defects load
+testing found were able to hide. When a change touches a query over `citizen`,
+`audit_event` or `incident`, measure it:
+
+```bash
+createdb pcid_load
+export DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/pcid_load
+npm run db:migrate && npm run db:seed
+npm run db:load-seed          # a hundred thousand people, in about a minute
+# ...or the real thing, in about fifteen:
+# npm run db:load-seed -- --citizens 4000000 --incidents 250000 --audit 3000000
+npm run load:probe            # every hot query's plan, and the audit chain's rate
+npm run load:run              # the end-to-end mix, against a running API
+npm run db:load-seed -- --remove
+```
+
+`load:probe` is the one to reach for first: it needs no API, takes a minute, and
+prints the access path every hot query takes. A plan that reaches its rows through
+an index still does at eight million; a sequential scan does not. Read
+[load-testing.md](load-testing.md) before adding an index — one of the five
+defects that exercise found was an index that made the platform's commonest query
+a hundred times slower, one time in twelve.
+
+The seeder writes registry rows directly, which nothing else in this repository
+does. It refuses production, refuses a database holding rows it did not create,
+and marks everything it writes so `--remove` is exact.
 
 ### The TOTP wrinkle
 

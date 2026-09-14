@@ -42,6 +42,15 @@ export const envSchema = z.object({
   RATE_LIMIT_WINDOW_SECONDS: durationSeconds.default(60),
   RATE_LIMIT_DEFAULT_MAX: z.coerce.number().int().positive().default(120),
   RATE_LIMIT_SEARCH_MAX: z.coerce.number().int().positive().default(20),
+  /**
+   * The largest result set a registry search will return (§63, §81).
+   *
+   * A search matching more people than this is refused with advice on what to
+   * add, rather than paged. Configurable because the right number depends on the
+   * size of the register: at four million records a name alone matches a hundred
+   * thousand people, and paging through them is browsing the register.
+   */
+  SEARCH_MAX_RESULTS: z.coerce.number().int().min(1).max(100_000).default(1_000),
   SEARCH_VOLUME_ALERT_THRESHOLD: z.coerce.number().int().positive().default(60),
   SEARCH_VOLUME_WINDOW_SECONDS: durationSeconds.default(3600),
 

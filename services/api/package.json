@@ -17,6 +17,9 @@
     "db:bootstrap": "node --import tsx src/database/bootstrap-cli.ts",
     "build:test": "tsc -p tsconfig.test.json",
     "db:demo": "node --import tsx src/database/demo-cli.ts",
+    "db:load-seed": "node --import tsx src/load/load-seed-cli.ts",
+    "load:run": "node --import tsx src/load/load-test-cli.ts",
+    "load:probe": "node --import tsx src/load/load-probe-cli.ts",
     "worker:notifications": "node dist/notifications/notification-worker-cli.js",
     "dev:worker": "node --import tsx src/notifications/notification-worker-cli.ts"
   },

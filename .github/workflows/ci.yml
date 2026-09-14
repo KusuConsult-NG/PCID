@@ -4,6 +4,11 @@ on:
   push:
     branches: ['**']
   pull_request:
+  # The load job is too slow for every push and too important to run only when
+  # somebody remembers. It runs nightly, and on demand before a release.
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -136,6 +141,109 @@ jobs:
           name: playwright-trace-${{ matrix.portal.name }}
           path: apps/*/e2e/.results/
           retention-days: 7
+
+  load:
+    name: Load regression
+    # Nightly and on demand only: a load run that added ten minutes to every
+    # push would be switched off within a week.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pcid_load
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/pcid_load
+      TOKEN_SIGNING_KEY: dGVzdC1zaWduaW5nLWtleS1mb3ItY2ktdXNlLW9ubHkxMg
+      SECRET_ENCRYPTION_KEY: dGVzdC1lbmNyeXB0aW9uLWtleS1mb3ItY2ktdXNlLW9ubHk
+      PCID_API_URL: http://127.0.0.1:3000
+      LOG_LEVEL: warn
+      # A hosted runner is two cores. The dataset is sized to fit the runner and
+      # the absolute numbers mean nothing on it; what this job watches is the
+      # trend and the budget, run after run on identical hardware.
+      LOAD_CITIZENS: '300000'
+      LOAD_INCIDENTS: '40000'
+      LOAD_AUDIT: '300000'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the API
+        run: npm run build --workspace services/api
+
+      - name: Migrate and seed
+        run: |
+          npm run db:migrate
+          npm run db:seed
+
+      - name: Generate the load dataset
+        run: |
+          npm run db:load-seed -- \
+            --citizens "$LOAD_CITIZENS" \
+            --incidents "$LOAD_INCIDENTS" \
+            --cases 10000 \
+            --units 200 \
+            --audit "$LOAD_AUDIT" \
+            --accounts 40
+
+      - name: Start the API
+        run: |
+          npm run start:api > api.log 2>&1 &
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/api/v1/health/ready > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != "1" ]; then
+            echo "the API did not become ready"
+            cat api.log
+            exit 1
+          fi
+
+      - name: Read the access paths and the audit chain's ceiling
+        run: npm run load:probe -- --chain 2000 --concurrency 16 --out load-probe.json
+
+      # `--think 3000` models an officer working, not a client hammering: the
+      # platform allows an account twenty searches a minute, so a run without it
+      # measures the rate limiter rather than the platform.
+      - name: Load run, ordinary working day
+        run: npm run load:run -- --users 40 --think 3000 --duration 120 --profile counter --out load-results-counter.json
+
+      - name: Load run, major incident
+        run: npm run load:run -- --users 40 --think 3000 --duration 120 --profile surge --out load-results-surge.json
+
+      - name: Upload the measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-results
+          path: |
+            load-probe.json
+            load-results-*.json
+            api.log
+          retention-days: 30
 
   container:
     name: Container image builds

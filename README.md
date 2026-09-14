@@ -32,6 +32,7 @@ supplied one, and is never required to obtain a PCID.
 | Security agency portal (`apps/security`)                      | Complete                                   |
 | Emergency response portal (`apps/emergency`)                  | Complete                                   |
 | Oversight: duplicate, correction and alert queues             | Complete                                   |
+| Load testing at statewide volume: harness, results, fixes     | Complete                                   |
 | Mobile applications                                           | Not started — see [Roadmap](#roadmap)      |
 
 Five things run: the REST API, documented in OpenAPI at `/api/v1/docs` (and
@@ -155,6 +156,20 @@ than the one that ships.
 The integration suite creates and drops its own databases; point
 `TEST_ADMIN_DATABASE_URL` at a PostgreSQL superuser connection.
 
+```bash
+npm run db:load-seed        # a four-million-record register to measure against
+npm run load:probe          # the access paths, and the audit chain's ceiling
+npm run load:run            # the end-to-end mix
+```
+
+[Load testing](docs/load-testing.md) has its own harness: it generates a register
+at statewide volume, reads every hot query's plan against it, measures the audit
+chain's throughput directly, and drives a realistic mix of concurrent officers
+through the real API. It found five defects that development volumes hide, all of
+them fixed — a duplicate-detection net that had stopped finding duplicates, an
+index that made one search in twelve a hundred times slower, and a sign-in
+limiter that would have locked out a whole office on the first morning.
+
 `npm run test:e2e` runs all four portal suites. Each starts an API and a portal
 of its own, against a database it recreates for the run, seeds them with `npm run
 db:demo`, and drives a real browser through the journeys — including an
@@ -163,23 +178,25 @@ build: `npx playwright install chromium`.
 
 ## The controls, and where to read them
 
-| Control                                   | Where it lives                                                                                               |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Sixteen ordered authorisation gates       | [`packages/policy/src/gates.ts`](packages/policy/src/gates.ts)                                               |
-| Field-by-field release                    | [`packages/policy/src/field-release.ts`](packages/policy/src/field-release.ts)                               |
-| What each field is, and who may see it    | [`packages/contracts/src/field-catalogue.ts`](packages/contracts/src/field-catalogue.ts)                     |
-| Enforcement, audit and obligations        | [`services/api/src/policy/policy.service.ts`](services/api/src/policy/policy.service.ts)                     |
-| Append-only, hash-chained audit           | [`db/migrations/0003_audit.sql`](db/migrations/0003_audit.sql)                                               |
-| Permanent PCID allocation                 | [`db/migrations/0004_citizen_registry.sql`](db/migrations/0004_citizen_registry.sql)                         |
-| The seven §75 propositions                | [`packages/policy/test/critical-authorization.test.ts`](packages/policy/test/critical-authorization.test.ts) |
-| The same, over HTTP                       | [`services/api/test/integration/authorization.test.ts`](services/api/test/integration/authorization.test.ts) |
-| The end-to-end acceptance scenario        | [`services/api/test/integration/acceptance.test.ts`](services/api/test/integration/acceptance.test.ts)       |
-| The portal's own security properties      | [`apps/portal/e2e/security.spec.ts`](apps/portal/e2e/security.spec.ts)                                       |
-| What an officer's account cannot do       | [`apps/government/e2e/entitlements.spec.ts`](apps/government/e2e/entitlements.spec.ts)                       |
-| A record is reachable only under a case   | [`apps/security/e2e/investigation.spec.ts`](apps/security/e2e/investigation.spec.ts)                         |
-| One agency, three officers, three portals | [`apps/security/e2e/supervision.spec.ts`](apps/security/e2e/supervision.spec.ts)                             |
-| WCAG 2.1 AA on every portal page          | [`apps/portal/e2e/accessibility.spec.ts`](apps/portal/e2e/accessibility.spec.ts)                             |
-| Every granted action has a route          | [`services/api/test/unit/action-coverage.test.ts`](services/api/test/unit/action-coverage.test.ts)           |
+| Control                                    | Where it lives                                                                                               |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Sixteen ordered authorisation gates        | [`packages/policy/src/gates.ts`](packages/policy/src/gates.ts)                                               |
+| Field-by-field release                     | [`packages/policy/src/field-release.ts`](packages/policy/src/field-release.ts)                               |
+| What each field is, and who may see it     | [`packages/contracts/src/field-catalogue.ts`](packages/contracts/src/field-catalogue.ts)                     |
+| Enforcement, audit and obligations         | [`services/api/src/policy/policy.service.ts`](services/api/src/policy/policy.service.ts)                     |
+| Append-only, hash-chained audit            | [`db/migrations/0003_audit.sql`](db/migrations/0003_audit.sql)                                               |
+| Permanent PCID allocation                  | [`db/migrations/0004_citizen_registry.sql`](db/migrations/0004_citizen_registry.sql)                         |
+| The seven §75 propositions                 | [`packages/policy/test/critical-authorization.test.ts`](packages/policy/test/critical-authorization.test.ts) |
+| The same, over HTTP                        | [`services/api/test/integration/authorization.test.ts`](services/api/test/integration/authorization.test.ts) |
+| The end-to-end acceptance scenario         | [`services/api/test/integration/acceptance.test.ts`](services/api/test/integration/acceptance.test.ts)       |
+| The portal's own security properties       | [`apps/portal/e2e/security.spec.ts`](apps/portal/e2e/security.spec.ts)                                       |
+| What an officer's account cannot do        | [`apps/government/e2e/entitlements.spec.ts`](apps/government/e2e/entitlements.spec.ts)                       |
+| A record is reachable only under a case    | [`apps/security/e2e/investigation.spec.ts`](apps/security/e2e/investigation.spec.ts)                         |
+| One agency, three officers, three portals  | [`apps/security/e2e/supervision.spec.ts`](apps/security/e2e/supervision.spec.ts)                             |
+| WCAG 2.1 AA on every portal page           | [`apps/portal/e2e/accessibility.spec.ts`](apps/portal/e2e/accessibility.spec.ts)                             |
+| Every granted action has a route           | [`services/api/test/unit/action-coverage.test.ts`](services/api/test/unit/action-coverage.test.ts)           |
+| Duplicate detection cannot miss a match    | [`services/api/test/unit/duplicate-detection.test.ts`](services/api/test/unit/duplicate-detection.test.ts)   |
+| A search too broad to be an identification | [`services/api/test/integration/security.test.ts`](services/api/test/integration/security.test.ts)           |
 
 ## What the platform deliberately cannot do
 
@@ -194,7 +211,10 @@ These are absences by design, and each is held by a test:
   own data and fetches nothing from anywhere: a tile provider receiving the
   rectangle a control room is looking at, several times a minute, would be
   receiving a description of where the state's emergencies are.
-- **No bulk export.** No role in the platform grants an export action.
+- **No bulk export.** No role in the platform grants an export action, and no
+  search returns more than a thousand people: a name against a register of four
+  million matches a hundred thousand of them, and paging through that is browsing
+  the register by another route. The refusal says what to add instead.
 - **No personal information in an outbound message.** An SMS or an email from
   the platform carries a notice — "there is something waiting for you" — and
   never the thing it is about. The detail is read in the portal, behind
@@ -219,6 +239,7 @@ These are absences by design, and each is held by a test:
 - [API](docs/api.md) — conventions every endpoint follows
 - [Deployment](docs/deployment.md) — running it in production
 - [Disaster recovery](docs/disaster-recovery.md) — RPO, RTO and the restore drill
+- [Load testing](docs/load-testing.md) — four million records, and what broke
 - [Incident response](docs/incident-response.md) — when something goes wrong
 - [MDA integration guide](docs/mda-integration.md) — connecting an agency system
 - [Administrator guide](docs/administrator-guide.md)
@@ -239,7 +260,9 @@ management, missing and unidentified persons, analytics, and notification
 delivery.
 
 Remaining before a pilot: the citizen, field officer and responder mobile
-applications; load testing; and an independent security assessment.
+applications, and an independent security assessment. Load testing is done —
+[docs/load-testing.md](docs/load-testing.md) records the method, the results, the
+five defects it found, and what it does not establish.
 [docs/architecture.md](docs/architecture.md#what-is-not-built-yet) sets out what
 each needs.
 

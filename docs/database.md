@@ -32,6 +32,7 @@ npm run db:seed       # reference data; also idempotent
 | `0011_audit_chain_serialisation` | The locked chain head that makes the audit chain correct under concurrency                                            |
 | `0012_notification_delivery`     | Templates, backoff, suppression, deduplication, and the per-attempt delivery record                                   |
 | `0013_spatial_lookup`            | Position indexes the command map's bounding-box queries actually use                                                  |
+| `0014_registry_search_at_scale`  | Trigram ordering for name search, an email index for duplicate detection, and the chain head's own vacuum settings    |
 
 ## Invariants held by the database
 
@@ -57,6 +58,35 @@ The application side is what makes them usable: the bounding box goes into the
 When the box finds nothing, the query falls back to measuring the whole fleet
 rather than answering "nothing to send" — a slow answer beats a wrong one when
 somebody is waiting for an ambulance.
+
+### A name search is bounded before it is answered
+
+Measured on four million records: `display_name % $1` matched a hundred and ten
+thousand people for a whole name and a quarter of a million for a surname, and
+`ORDER BY display_name` then had to sort all of them to return twenty. One search
+read the entire table and took 2.6 seconds.
+
+Three changes, and the order of them is the point:
+
+1. The count runs first and stops at the cap (`LIMIT 1001`), so discovering that
+   a search is too broad costs 32-85ms instead of 2.6 seconds.
+2. A search matching more people than an officer could look through is refused
+   with advice on what to add, so the expensive page is never built. This is a
+   privacy control before it is a performance one: a surname against a statewide
+   register is not an identification, and paging through the result is browsing
+   the register.
+3. What remains is ordered by trigram distance, not alphabetically, which a GiST
+   index answers by walking in that order. A name with a date of birth beside it
+   - the search a service counter actually makes - is answered in 2.5ms.
+
+Duplicate detection had the same defect and a worse consequence. It matched on
+`similarity(family_name, $2) > 0.3`, which is a function call and so not an index
+condition: every registration read the whole register, 1.3 seconds each. It had
+also stopped working: a surname net over a statewide register returns a couple of
+hundred thousand people, and the query took an arbitrary fifty of them, so a real
+duplicate was usually not among them. The net is now the surname paired with the
+date of birth, which no candidate above the review threshold can escape - the
+arithmetic is asserted by a test - and it runs in 0.4ms.
 
 ### A message is never sent twice, and never sent for ever
 
@@ -108,6 +138,18 @@ the order the chain is forged in has to be the order it is verified in.
 The trigger is `SECURITY DEFINER` and `pcid_app` holds no privilege on
 `audit_chain_head` at all, so no application path — not even a direct connection
 — can choose its own predecessor.
+
+The chain head is one row, updated once per audited operation, and autovacuum's
+defaults are written for tables where a few per cent of rows change. Three
+million audit events left that single row occupying 32MB of dead versions.
+`0014` gives it its own vacuum settings - after twenty-five updates, with no cost
+delay - because it is one page and the busiest one in the platform.
+
+Measured throughput of the chain: about 1,100 audited writes a second on one
+connection and about 1,300 across sixteen. The second figure is the ceiling on
+audited operations for the whole platform, and adding API instances does not
+raise it. `docs/load-testing.md` sets out what that means and when it would need
+revisiting.
 
 ### A PCID is never recycled
 

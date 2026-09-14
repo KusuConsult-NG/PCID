@@ -131,7 +131,9 @@ export default async function FindPage({
               ? 'This search needs a case'
               : result.error.code === 'RATE_LIMITED'
                 ? 'Too many searches'
-                : 'That search could not be run'
+                : result.error.code === 'VALIDATION_FAILED'
+                  ? 'Too many people match'
+                  : 'That search could not be run'
           }
           live
         >

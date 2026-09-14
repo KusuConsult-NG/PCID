@@ -363,3 +363,49 @@ describe('configuration safety (§77)', () => {
     );
   });
 });
+
+describe('rate limiting (§45, §63)', () => {
+  test('a budget can be read without being spent', async () => {
+    const { MemoryCounterStore } = await import('../../src/security/rate-limit');
+    const store = new MemoryCounterStore();
+    try {
+      // This is what lets a limiter count outcomes rather than attempts: the
+      // sign-in path checks the address budget before it knows whether the
+      // credentials were right, and spends from it only on a failure.
+      for (let index = 0; index < 20; index += 1) {
+        const peek = await store.increment('login-ip-failures:10.0.0.1', 900, 0);
+        assert.equal(peek.count, 0, 'a peek must not spend from the budget');
+      }
+      const spent = await store.increment('login-ip-failures:10.0.0.1', 900, 1);
+      assert.equal(spent.count, 1);
+      const after = await store.increment('login-ip-failures:10.0.0.1', 900, 0);
+      assert.equal(after.count, 1);
+    } finally {
+      await store.close();
+    }
+  });
+
+  test('a shift change does not exhaust an office address, but a failure run does', async () => {
+    const { MemoryCounterStore } = await import('../../src/security/rate-limit');
+    const store = new MemoryCounterStore();
+    const key = 'login-ip-failures:41.58.0.7';
+    const budget = 50;
+    try {
+      // Two hundred colleagues signing in correctly from behind one gateway.
+      // Nothing is spent, because nothing failed.
+      for (let index = 0; index < 200; index += 1) {
+        const decision = await store.increment(key, 900, 0);
+        assert.ok(decision.count <= budget, 'a successful sign-in must not consume the budget');
+      }
+      // Credential stuffing from the same address still trips it.
+      let tripped = false;
+      for (let index = 0; index < budget + 1; index += 1) {
+        const decision = await store.increment(key, 900, 1);
+        if (decision.count > budget) tripped = true;
+      }
+      assert.ok(tripped, 'a run of failures from one address must exhaust the budget');
+    } finally {
+      await store.close();
+    }
+  });
+});

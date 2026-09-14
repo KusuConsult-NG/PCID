@@ -12,11 +12,22 @@ import { createTestContext } from './harness';
  * regression that reopens the hole fails the build rather than waiting for a
  * penetration test to find it.
  */
+/**
+ * A search that matches more people than anybody could look through is refused
+ * rather than paged (§63). Production runs that ceiling at a thousand; here it is
+ * two, so the control can be exercised against three registrations rather than a
+ * statewide register. This suite runs in its own process, so the setting affects
+ * nothing else.
+ */
+process.env.SEARCH_MAX_RESULTS = '2';
+
 describe('§74 security tests', () => {
   let context: TestContext;
   let admin: ApiClient;
   let registrar: CreatedUser;
   let registrarClient: ApiClient;
+  /** A second desk with an untouched search budget, for the ceiling test. */
+  let secondDeskClient: ApiClient;
   let revenueClient: ApiClient;
   let revenueUser: CreatedUser;
   let investigatorClient: ApiClient;
@@ -63,6 +74,13 @@ describe('§74 security tests', () => {
       roles: ['REGISTRATION_OFFICER'],
       clearance: 'HIGHLY_RESTRICTED',
     });
+    const secondDesk = await createUser(context, session.accessToken, {
+      email: 'second.desk@pcid.plateaustate.gov.ng',
+      fullName: 'Counter Two',
+      agencyId: registry.id,
+      roles: ['REGISTRATION_OFFICER'],
+      clearance: 'HIGHLY_RESTRICTED',
+    });
     revenueUser = await createUser(context, session.accessToken, {
       email: 'revenue@pcid.plateaustate.gov.ng',
       fullName: 'Revenue Officer',
@@ -81,6 +99,11 @@ describe('§74 security tests', () => {
     registrarClient = new ApiClient(
       context,
       (await signIn(context, registrar.email, registrar.password, registrar.totpSecret))
+        .accessToken,
+    );
+    secondDeskClient = new ApiClient(
+      context,
+      (await signIn(context, secondDesk.email, secondDesk.password, secondDesk.totpSecret))
         .accessToken,
     );
     revenueClient = new ApiClient(
@@ -556,5 +579,55 @@ describe('§74 security tests', () => {
     const error = (response.body as { error: { code: string; message: string } }).error;
     assert.equal(error.code, 'CASE_REFERENCE_REQUIRED');
     assert.match(error.message, /case/i);
+  });
+
+  test('a search that matches more people than the ceiling is refused, not paged', async () => {
+    // Three people sharing a surname, against a ceiling of two. On the real
+    // register the ceiling is a thousand and a surname matches two hundred
+    // thousand; the arithmetic is the same and so is the answer.
+    for (const [index, given] of ['Ladi', 'Nanle', 'Talatu'].entries()) {
+      await secondDeskClient
+        .post('/api/v1/citizens', {
+          givenName: given,
+          familyName: 'Choji',
+          sex: 'FEMALE',
+          dateOfBirth: `197${index}-03-0${index + 1}`,
+          phonePrimary: `0803000091${index}`,
+          lgaCode: 'PL-JNO',
+          wardCode: 'PL-JNO-01',
+          channel: 'REGISTRATION_DESK',
+        })
+        .expect(201);
+    }
+
+    const refused = await secondDeskClient
+      .get('/api/v1/citizens?purpose=SERVICE_DELIVERY&name=Choji&limit=20')
+      .expect(400);
+    const error = (refused.body as { error: { code: string; message: string } }).error;
+    assert.equal(error.code, 'VALIDATION_FAILED');
+    // The refusal says what to add, because the officer has the person in front
+    // of them and can ask. It must not say how many matched beyond the ceiling:
+    // "more than two" is what the platform counted, and counting further is the
+    // cost the ceiling exists to avoid.
+    assert.match(error.message, /date of birth|telephone|Plateau Citizen ID/i);
+    assert.doesNotMatch(error.message, /\b3 people\b/);
+
+    // The same search with a date of birth beside it is answered, because it
+    // identifies somebody rather than describing a lot of people.
+    const answered = await secondDeskClient
+      .get('/api/v1/citizens?purpose=SERVICE_DELIVERY&name=Choji&dateOfBirth=1970-03-01&limit=20')
+      .expect(200);
+    const found = answered.body as {
+      total: number;
+      results: { data: Record<string, unknown>; restrictedFields: string[] }[];
+    };
+    assert.equal(found.total, 1);
+    assert.equal(found.results.length, 1);
+    // Which fields come back is the field catalogue's business and is asserted
+    // at length elsewhere. What matters here is that the same name identified one
+    // person once a date of birth was beside it, instead of describing a crowd -
+    // and that the row is still a projection through a decision, carrying what
+    // was withheld as well as what was released.
+    assert.ok(Array.isArray(found.results[0]?.restrictedFields));
   });
 });
