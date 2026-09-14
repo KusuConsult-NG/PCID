@@ -19,4 +19,5 @@ import '../../iam/auth.controller';
 import '../../identity/citizen-portal.controller';
 import '../../identity/citizens.controller';
 import '../../missing-persons/missing-persons.controller';
+import '../../notifications/notifications.controller';
 import '../../oversight/oversight.controller';

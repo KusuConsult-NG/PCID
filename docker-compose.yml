@@ -73,6 +73,38 @@ services:
     security_opt: ['no-new-privileges:true']
     cap_drop: ['ALL']
 
+  # The notification delivery worker: the same image as the API with a different
+  # command. It serves no HTTP, opens no port and holds no session; it claims
+  # messages with FOR UPDATE SKIP LOCKED, so the number of replicas is an
+  # operational decision rather than a correctness one.
+  notification-worker:
+    build: .
+    command: ['node', 'services/api/dist/notifications/notification-worker-cli.js']
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://pcid:pcid-local-development@postgres:5432/pcid
+      DATABASE_SSL: require
+      TOKEN_SIGNING_KEY: ${TOKEN_SIGNING_KEY:?set TOKEN_SIGNING_KEY}
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:?set SECRET_ENCRYPTION_KEY}
+      ALLOW_SANDBOX_ADAPTERS: 'false'
+      # With no gateway configured and sandbox adapters refused, the worker
+      # reports every message as having no sender rather than logging it and
+      # claiming success. That is the safe direction: a hundred per cent
+      # delivery rate that is really a log file is worse than an obvious failure.
+      SMS_GATEWAY_URL: ${SMS_GATEWAY_URL:-}
+      EMAIL_GATEWAY_URL: ${EMAIL_GATEWAY_URL:-}
+      NOTIFICATION_GATEWAY_TOKEN: ${NOTIFICATION_GATEWAY_TOKEN:-}
+      NOTIFICATION_WORKER_INTERVAL_SECONDS: 30
+      NOTIFICATION_WORKER_BATCH_SIZE: 25
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    read_only: true
+    tmpfs: ['/tmp']
+    security_opt: ['no-new-privileges:true']
+    cap_drop: ['ALL']
+
   portal:
     build:
       context: .

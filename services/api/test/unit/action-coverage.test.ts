@@ -47,7 +47,6 @@ describe('authorisation coverage', () => {
     ADMIN_ROLE_MANAGE: 'role administration',
     ADMIN_REFERENCE_DATA_MANAGE: 'reference data administration',
     ADMIN_NOTIFICATION_RULE_MANAGE: 'notification rule administration',
-    ADMIN_SYSTEM_MANAGE: 'platform settings administration',
   });
 
   test('every action a seeded role grants is performed by a documented route', () => {

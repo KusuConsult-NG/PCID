@@ -8,6 +8,7 @@ import { WhereBuilder } from '../common/sql';
 import { Database } from '../database/pool';
 import type { QueryRunner } from '../database/pool';
 import type { AuthenticatedActor } from '../iam/actor';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PolicyService } from '../policy/policy.service';
 
 /**
@@ -79,6 +80,7 @@ export class CorrectionsService {
     private readonly db: Database,
     private readonly policy: PolicyService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async list(
@@ -226,17 +228,17 @@ export class CorrectionsService {
     // The resident is told that somebody asked for their record to be changed,
     // before it is changed, so a correction raised without their knowledge is
     // visible to them while it is still a request.
-    await this.db.query(
-      `INSERT INTO notification (channel, recipient_type, recipient_id, subject, body, classification)
-       VALUES ('IN_APP','CITIZEN',$1,$2,$3,'INTERNAL')`,
-      [
-        pcid,
-        `A government office has asked for a change to your record (${reference})`,
+    await this.notifications.enqueue({
+      template: 'CORRECTION_RAISED',
+      recipientType: 'CITIZEN',
+      recipientId: pcid,
+      subject: `A government office has asked for a change to your record (${reference})`,
+      detail:
         `${actor.agencyName ?? 'A government office'} asked for ${input.fieldPath} to be changed. ` +
-          'You will be told when it is decided. If you did not expect this, report it from the ' +
-          '"Report something" page.',
-      ],
-    );
+        'You will be told when it is decided. If you did not expect this, report it from the ' +
+        '"Report something" page.',
+      dedupeKey: `correction-raised:${reference}`,
+    });
 
     return { reference, status: 'SUBMITTED' };
   }
@@ -338,14 +340,18 @@ export class CorrectionsService {
         runner,
       );
 
-      await runner.query(
-        `INSERT INTO notification (channel, recipient_type, recipient_id, subject, body, classification)
-         VALUES ('IN_APP','CITIZEN',$1,$2,$3,'INTERNAL')`,
-        [
-          row.pcid,
-          `Your correction request ${row.reference} has been ${status === 'APPLIED' ? 'applied' : status === 'REJECTED' ? 'rejected' : 'returned for evidence'}`,
-          note,
-        ],
+      // Inside the transaction: if the decision rolls back, so does telling
+      // them it was decided.
+      await this.notifications.enqueue(
+        {
+          template: 'CORRECTION_DECIDED',
+          recipientType: 'CITIZEN',
+          recipientId: row.pcid,
+          subject: `Your correction request ${row.reference} has been ${status === 'APPLIED' ? 'applied' : status === 'REJECTED' ? 'rejected' : 'returned for evidence'}`,
+          detail: note,
+          dedupeKey: `correction-decided:${row.reference}`,
+        },
+        runner,
       );
 
       return { ...this.present({ ...row, status }), applied, decidedBy: actor.displayName };

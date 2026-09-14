@@ -42,6 +42,11 @@ import { MatchingEngine } from './missing-persons/matching.engine';
 import { AlertsService } from './oversight/alerts.service';
 import { CorrectionsService } from './oversight/corrections.service';
 import { MissingPersonsController } from './missing-persons/missing-persons.controller';
+import { NotificationDeliveryWorker } from './notifications/delivery.worker';
+import { NotificationOperationsService } from './notifications/operations.service';
+import { NotificationsController } from './notifications/notifications.controller';
+import { NotificationsService } from './notifications/notifications.service';
+import { NotificationWorkerScheduler } from './notifications/worker.scheduler';
 import { MissingPersonsService } from './missing-persons/missing-persons.service';
 import { OversightController } from './oversight/oversight.controller';
 import { PcidService } from './identity/pcid.service';
@@ -73,6 +78,7 @@ import { SecurityModule } from './security/security.module';
     AuditController,
     AnalyticsController,
     IntegrationController,
+    NotificationsController,
   ],
   providers: [
     ActorService,
@@ -102,6 +108,10 @@ import { SecurityModule } from './security/security.module';
     AccessService,
     AnalyticsService,
     IntegrationService,
+    NotificationsService,
+    NotificationDeliveryWorker,
+    NotificationOperationsService,
+    NotificationWorkerScheduler,
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],

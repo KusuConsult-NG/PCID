@@ -25,6 +25,7 @@ supplied one, and is never required to obtain a PCID.
 | Missing persons, unidentified persons, candidate matching     | Complete                                   |
 | Integration framework and linked-record projections           | Complete (sandbox and production adapters) |
 | Public-safety analytics with small-number suppression         | Complete                                   |
+| Notification delivery: templates, worker, retry, operations   | Complete                                   |
 | Citizen portal (`apps/portal`)                                | Complete                                   |
 | Government portal (`apps/government`)                         | Complete                                   |
 | Security agency portal (`apps/security`)                      | Complete                                   |
@@ -187,6 +188,10 @@ These are absences by design, and each is held by a test:
   response units, reported by the units themselves. Every stored coordinate
   records how it was obtained; there is no code path that observes a person.
 - **No bulk export.** No role in the platform grants an export action.
+- **No personal information in an outbound message.** An SMS or an email from
+  the platform carries a notice — "there is something waiting for you" — and
+  never the thing it is about. The detail is read in the portal, behind
+  authentication, by the person it concerns.
 - **No citizen risk scoring.** Nothing scores, ranks or classifies a person, and
   no query groups by any protected or sensitive characteristic.
 - **No automated identification.** The matching engine produces candidates with

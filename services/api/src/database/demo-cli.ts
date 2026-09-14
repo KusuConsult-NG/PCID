@@ -14,6 +14,7 @@ import { randomBytes } from 'node:crypto';
 
 import { loadEnv } from '../config/env';
 import { bootstrapPlatformAdministrator } from './bootstrap';
+import { NotificationsService } from '../notifications/notifications.service';
 import { Database } from './pool';
 import { seedReferenceData } from './seed';
 
@@ -433,21 +434,33 @@ async function main(): Promise<void> {
       });
     }
 
-    // A message waiting in the portal inbox.
-    await db.query(
-      `INSERT INTO notification (channel, recipient_type, recipient_id, subject, body, classification)
-       VALUES ('IN_APP','CITIZEN',$1,'Welcome to the Plateau Citizen Portal',
-               'Your portal account is ready. Please choose your own passphrase and add an emergency contact.',
-               'INTERNAL')`,
-      [registration.pcid],
-    );
+    // Messages waiting in the portal inbox, and in the delivery queue: the
+    // welcome goes to the inbox with the detail and to the resident's phone as
+    // a notice, which is the whole point of the template catalogue.
+    const notifications = new NotificationsService(db, env);
+    await notifications.enqueue({
+      template: 'PORTAL_WELCOME',
+      recipientType: 'CITIZEN',
+      recipientId: registration.pcid,
+      subject: 'Welcome to the Plateau Citizen Portal',
+      detail:
+        'Your portal account is ready. Please choose your own passphrase and add an emergency contact.',
+      dedupeKey: `portal-welcome:${registration.pcid}`,
+    });
 
     if (asJson) {
       process.stdout.write(
         `${JSON.stringify(
           {
             citizen: { pcid: portal.pcid, temporaryPassword: portal.temporaryPassword },
-            administrator: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+            // The administrator's authenticator too, so an end-to-end suite can
+            // sign in as one and check that a technical role sees administration
+            // and nothing about anybody (§7).
+            administrator: {
+              email: ADMIN_EMAIL,
+              password: ADMIN_PASSWORD,
+              totpSecret: bootstrap.totpSecret,
+            },
             officers: OFFICERS.map((officer) => ({
               email: officer.email,
               password: officerPasswords.get(officer.email) ?? null,

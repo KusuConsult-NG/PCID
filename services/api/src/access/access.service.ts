@@ -14,6 +14,7 @@ import type { RequestContext } from '../common/correlation';
 import { WhereBuilder } from '../common/sql';
 import { Database } from '../database/pool';
 import type { AuthenticatedActor } from '../iam/actor';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PolicyService } from '../policy/policy.service';
 
 export interface CreateAccessRequestInput {
@@ -58,6 +59,7 @@ export class AccessService {
     private readonly db: Database,
     private readonly policy: PolicyService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async createRequest(
@@ -630,16 +632,21 @@ export class AccessService {
       [actor.subject.agencyId, actor.subject.userId],
     );
     for (const supervisor of supervisors) {
-      await this.db.query(
-        `INSERT INTO notification (channel, recipient_type, recipient_id, recipient_address, subject, body, classification)
-         VALUES ('EMAIL','GOVERNMENT_USER',$1,$2,$3,$4,'INTERNAL')`,
-        [
-          supervisor.id,
-          supervisor.email,
-          `Emergency access used: ${reference}`,
-          `${actor.displayName} used break-glass access (${reference}). Stated reason: ${reason}. A post-event review is required within 24 hours.`,
-        ],
-      );
+      // The detail goes to the portal inbox, where it is read by the supervisor
+      // behind authentication. The email that lands in their mailbox says only
+      // that emergency access has been used and a review is due: who used it and
+      // why is the sort of thing a shared mailbox should not be broadcasting
+      // about a colleague.
+      await this.notifications.enqueue({
+        template: 'BREAK_GLASS_USED',
+        recipientType: 'GOVERNMENT_USER',
+        recipientId: supervisor.id,
+        subject: `Emergency access used: ${reference}`,
+        detail:
+          `${actor.displayName} used break-glass access (${reference}). Stated reason: ${reason}. ` +
+          'A post-event review is required within 24 hours.',
+        dedupeKey: `break-glass-used:${reference}:${supervisor.id}`,
+      });
     }
   }
 }

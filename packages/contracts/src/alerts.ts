@@ -43,15 +43,9 @@ export const ALERT_RULE_KINDS = [
 ] as const;
 export type AlertRuleKind = (typeof ALERT_RULE_KINDS)[number];
 
-export const NOTIFICATION_CHANNELS = ['SMS', 'EMAIL', 'PUSH', 'IN_APP', 'DASHBOARD'] as const;
-export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
-
-export const NOTIFICATION_STATUSES = [
-  'QUEUED',
-  'SENDING',
-  'SENT',
-  'DELIVERED',
-  'FAILED',
-  'SUPPRESSED',
-] as const;
-export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
+// The notification channel and status vocabulary lived here, because alerts
+// were the first thing in the platform that produced a notification. It is in
+// `./notifications` now, alongside the templates that decide what each channel
+// may carry.
+export type { NotificationChannel, NotificationStatus } from './notifications';
+export { NOTIFICATION_CHANNELS, NOTIFICATION_STATUSES } from './notifications';

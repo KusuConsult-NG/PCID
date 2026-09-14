@@ -247,6 +247,36 @@ a job it attended cannot debrief it or answer a complaint about it.
 
 ## Decisions worth explaining
 
+### A message that leaves the platform carries a notice, not the thing itself
+
+The same event produces different text on different channels, and the difference
+is not formatting.
+
+In the portal, behind authentication, a resident reads "Plateau State Police
+Command opened your record on 14 September under a criminal investigation". On
+their telephone they get "There is a new entry in your Plateau Citizen Portal
+access history", and they sign in to read the rest.
+
+An SMS crosses a network in clear text, arrives at a number that may have been
+reassigned since the resident gave it, and is read on a lock screen by whoever
+is holding the handset. An email lands in a mailbox somebody else may have
+access to. Neither is a place to say which agency is looking at somebody and
+why, however true it is and however entitled they are to know it.
+
+The rule lives in a catalogue of constants in
+[`packages/contracts/src/notifications.ts`](../packages/contracts/src/notifications.ts):
+each template declares the channels it may go out on and the one line it is
+allowed to say on an external one. `NotificationsService` is the only place a
+notification is created, and it applies the catalogue rather than trusting the
+producer — because every producer used to write its own body, which is how a
+sentence meant for a portal inbox ends up in a text message.
+
+A catalogue of constants is exactly the sort of thing somebody edits in a hurry,
+so the unit tests hold it to its own rule: a notice containing an interpolation
+placeholder fails, because a placeholder is where a name would end up; so does
+one containing a case number, a PCID or a field path; so does one longer than a
+single message.
+
 ### The token carries identity, not entitlements
 
 An access token names the subject, the session and the assurance level, and
@@ -376,8 +406,6 @@ The API and the four portals are the surface today. Still to build:
   the controlled offline mode described in §56 — encrypted, expiring,
   device-bound, minimal, revocable, and never a copy of the registry.
 - **The GIS command map**: the data and the PostGIS indexes are in place.
-- **Notification delivery workers**: notifications are queued and their state is
-  modelled; the SMS, email and push senders are not written.
 - **Load testing** against statewide volumes, and an independent security
   assessment. Neither can be self-certified, and neither has been done.
 

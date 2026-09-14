@@ -248,3 +248,29 @@ are read per request rather than carried in the token.
 LGAs, wards and communities are seeded and updated by migration. The seeded ward
 list is a placeholder structure of three wards per LGA; replace it with the State
 Independent Electoral Commission's reference data before a pilot.
+
+## Message delivery
+
+The **Message delivery** section of the administration page is the one thing on
+it worth looking at daily. It shows what is queued, what has failed in the last
+24 hours grouped by cause, the oldest message still waiting, and anything the
+platform has given up on.
+
+It shows no message body, no subject and no recipient, and that is deliberate: a
+delivery queue does not need to read anybody's post, and you hold no entitlement
+to citizen data (§7). What it shows instead is the template key, which says what
+kind of message it was.
+
+Two numbers matter. A growing `QUEUED` depth means the worker is not running or
+cannot keep up. A growing `FAILED` count means a gateway is rejecting messages —
+the grouped causes will tell you which and why. Five attempts with backoff and
+the platform stops trying, because a queue that retries for ever has a depth
+that means nothing.
+
+When you have fixed the gateway, put the abandoned messages back with **Put it
+back on the queue**. You have to say why; the sentence is what the next person
+reading the queue needs, and it goes on the audit record. Nothing about what
+will be sent changes — that was decided by the template when the message was
+raised.
+
+## What your agency cannot do

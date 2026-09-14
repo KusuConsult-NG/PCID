@@ -39,7 +39,11 @@ export const CREDENTIALS_FILE = resolve(ARTEFACT_DIRECTORY, 'demo.json');
 
 export interface DemoCredentials {
   readonly citizen: { readonly pcid: string; readonly temporaryPassword: string };
-  readonly administrator: { readonly email: string; readonly password: string };
+  readonly administrator: {
+    readonly email: string;
+    readonly password: string;
+    readonly totpSecret: string;
+  };
   readonly officers: readonly {
     readonly email: string;
     readonly password: string;
@@ -60,3 +64,12 @@ export const STATE_FILES: Readonly<Record<OfficerRole, string>> = {
   VERIFICATION_OFFICER: resolve(ARTEFACT_DIRECTORY, 'counter-state.json'),
   DATA_PROTECTION_OFFICER: resolve(ARTEFACT_DIRECTORY, 'dpo-state.json'),
 };
+
+/**
+ * The platform administrator's session.
+ *
+ * A technical role that holds no entitlement to citizen data at all (§7), which
+ * is a claim worth checking from the administrator's side as well as from the
+ * officer's.
+ */
+export const ADMINISTRATOR_STATE = resolve(ARTEFACT_DIRECTORY, 'platform-admin-state.json');

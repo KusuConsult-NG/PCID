@@ -1,11 +1,13 @@
-import { Badge, Empty, Notice } from '@pcid/portal-kit/components';
+import { Badge, Empty, Notice, SubmitButton, TextArea } from '@pcid/portal-kit/components';
 import { formatDateTime, sentenceCase } from '@pcid/portal-kit/format';
 import type { Metadata } from 'next';
 
 import { PageHeader } from '@/components/chrome';
 import { callApi, dataOr } from '@/lib/api';
 import { can, readSession } from '@/lib/session';
-import type { Agency, DataSource, GovernmentUser } from '@/lib/types';
+import type { Agency, DataSource, GovernmentUser, NotificationQueue } from '@/lib/types';
+
+import { retryNotification, sweepNotifications } from './actions';
 
 export const metadata: Metadata = { title: 'Administration' };
 
@@ -17,15 +19,28 @@ export const metadata: Metadata = { title: 'Administration' };
  * confers no entitlement to citizen data — the policy engine never widens a data
  * decision because the caller is an administrator.
  */
-export default async function AdministrationPage() {
+export default async function AdministrationPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const one = (key: string): string | undefined =>
+    typeof params[key] === 'string' && params[key] !== '' ? (params[key] as string) : undefined;
+
   const session = await readSession();
 
-  const [agencies, users, sources] = await Promise.all([
+  const [agencies, users, sources, queue] = await Promise.all([
     can(session, 'ADMIN_AGENCY_MANAGE') ? callApi<Agency[]>('/api/v1/agencies') : null,
     can(session, 'ADMIN_USER_MANAGE')
       ? callApi<{ total: number; users: GovernmentUser[] }>('/api/v1/users?limit=100')
       : null,
     can(session, 'ADMIN_INTEGRATION_MANAGE') ? callApi<DataSource[]>('/api/v1/integrations') : null,
+    // Delivery is administration, not access: this returns counts and causes,
+    // and no message body, subject or recipient.
+    can(session, 'ADMIN_SYSTEM_MANAGE')
+      ? callApi<NotificationQueue>('/api/v1/notifications/queue')
+      : null,
   ]);
 
   return (
@@ -183,13 +198,154 @@ export default async function AdministrationPage() {
         </section>
       )}
 
-      {agencies === null && users === null && sources === null ? (
+      {queue === null ? null : (
+        <section className="card" id="delivery" aria-labelledby="delivery-heading">
+          <div className="card-header">
+            <h2 id="delivery-heading">Message delivery</h2>
+            <Badge tone={dataOr(queue, { abandoned: [] }).abandoned.length === 0 ? 'ok' : 'danger'}>
+              {dataOr(queue, { abandoned: [] }).abandoned.length} abandoned
+            </Badge>
+          </div>
+
+          {one('error') === undefined ? null : (
+            <Notice tone="danger" title="That could not be done" live>
+              {one('error') === 'note'
+                ? 'Say why you are putting it back. The next person reading this queue needs the sentence.'
+                : (one('message') ?? 'Please try again.')}
+            </Notice>
+          )}
+          {one('requeued') === '1' ? (
+            <Notice tone="ok" title="Back on the queue" live>
+              Nothing about what it says has changed — that was decided when the message was raised.
+            </Notice>
+          ) : null}
+          {one('swept') === undefined ? null : (
+            <Notice tone="ok" title={`${one('swept')} sent`} live>
+              {one('claimed')} taken from the queue.
+            </Notice>
+          )}
+
+          <p>
+            What is waiting, what is failing and what has been given up on. This screen shows no
+            message body, no subject and no recipient: a delivery queue does not need to read
+            anybody&rsquo;s post, and a screen that showed it would be a second copy of every inbox
+            with none of the controls on the first.
+          </p>
+
+          <Table
+            rows={dataOr(queue, { counts: [] }).counts}
+            caption="Queued messages by channel and status"
+            empty="Nothing has been queued."
+            columns={[
+              { header: 'Channel', render: (row) => sentenceCase(row.channel) },
+              {
+                header: 'Status',
+                render: (row) => (
+                  <Badge tone={statusTone(row.status)}>{sentenceCase(row.status)}</Badge>
+                ),
+              },
+              { header: 'Messages', render: (row) => row.count },
+            ]}
+          />
+
+          <dl className="facts">
+            <dt>Oldest still waiting</dt>
+            <dd>
+              {dataOr(queue, { oldestWaitingAt: null }).oldestWaitingAt === null
+                ? 'Nothing is waiting.'
+                : formatDateTime(dataOr(queue, { oldestWaitingAt: null }).oldestWaitingAt)}
+            </dd>
+          </dl>
+
+          <form action={sweepNotifications}>
+            <div className="actions">
+              <SubmitButton className="button button-secondary" pendingLabel="Sending…">
+                Run a delivery sweep now
+              </SubmitButton>
+            </div>
+          </form>
+
+          <h3>Failures in the last 24 hours</h3>
+          <Table
+            rows={dataOr(queue, { failuresLast24Hours: [] }).failuresLast24Hours}
+            caption="Delivery failures grouped by cause"
+            empty="Nothing has failed."
+            columns={[
+              { header: 'Channel', render: (row) => sentenceCase(row.channel) },
+              { header: 'What the gateway said', render: (row) => row.detail ?? '—' },
+              { header: 'Times', render: (row) => row.count },
+            ]}
+          />
+
+          <h3>Given up on</h3>
+          <p className="muted small">
+            Five attempts with backoff, then the platform stops. A queue that retries for ever is a
+            queue whose depth means nothing, and an operator who cannot tell a backlog from a
+            permanently broken number stops looking at either.
+          </p>
+          {dataOr(queue, { abandoned: [] }).abandoned.length === 0 ? (
+            <Empty>Nothing has been abandoned.</Empty>
+          ) : (
+            <div className="stack">
+              {dataOr(queue, { abandoned: [] }).abandoned.map((entry) => (
+                <div className="card" key={entry.id} style={{ boxShadow: 'none' }}>
+                  <div className="card-header">
+                    <h4>{sentenceCase(entry.template)}</h4>
+                    <Badge tone="danger">
+                      {sentenceCase(entry.channel)} · {entry.attempts} attempts
+                    </Badge>
+                  </div>
+                  <dl className="facts">
+                    <dt>Raised</dt>
+                    <dd>{formatDateTime(entry.queuedAt)}</dd>
+                    <dt>Last error</dt>
+                    <dd>{entry.lastError ?? '—'}</dd>
+                  </dl>
+                  <form action={retryNotification} noValidate>
+                    <input type="hidden" name="notificationId" value={entry.id} />
+                    <TextArea
+                      name="note"
+                      id={`retry-note-${entry.id}`}
+                      label="Why you are putting it back"
+                      hint="What was fixed. The next person reading this queue needs the sentence."
+                      required
+                      maxLength={500}
+                    />
+                    <div className="actions">
+                      <SubmitButton pendingLabel="Requeueing…">
+                        Put it back on the queue
+                      </SubmitButton>
+                    </div>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {agencies === null && users === null && sources === null && queue === null ? (
         <section className="card">
           <Empty>Your account holds no administration entitlements.</Empty>
         </section>
       ) : null}
     </>
   );
+}
+
+function statusTone(status: string): 'ok' | 'warn' | 'danger' | 'info' | 'muted' {
+  switch (status) {
+    case 'SENT':
+    case 'DELIVERED':
+      return 'ok';
+    case 'QUEUED':
+    case 'SENDING':
+      return 'info';
+    case 'FAILED':
+      return 'danger';
+    default:
+      return 'muted';
+  }
 }
 
 function Table<T>({

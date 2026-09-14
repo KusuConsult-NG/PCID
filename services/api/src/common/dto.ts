@@ -12,6 +12,8 @@ import {
   REGISTRATION_CHANNELS,
   RESOURCE_TYPES,
   RESPONSE_UNIT_STATUSES,
+  NOTIFICATION_CHANNELS,
+  NOTIFICATION_STATUSES,
   RESPONSE_UNIT_TYPES,
   SEXES,
   UNIDENTIFIED_PERSON_CONDITIONS,
@@ -196,6 +198,19 @@ export const updateResponseUnitSchema = z
   .refine((value) => Object.keys(value).length > 0, {
     message: 'Supply at least one field to update.',
   });
+
+/* --- Notification delivery ------------------------------------------------ */
+
+export const notificationQueueSchema = z.object({
+  channel: z.enum(NOTIFICATION_CHANNELS as unknown as [string, ...string[]]).optional(),
+  status: z.enum(NOTIFICATION_STATUSES as unknown as [string, ...string[]]).optional(),
+});
+
+export const notificationRetrySchema = z.object({
+  // An operator putting an abandoned message back says why. "The SMS gateway
+  // certificate had expired" is the sentence the next person needs.
+  note: z.string().min(5).max(500),
+});
 
 export const incidentOfficerSchema = z.object({
   userId: uuidSchema,

@@ -16,7 +16,9 @@
     "test:integration": "npm run build:test && node --test --test-concurrency=1 \"dist-test/test/integration/**/*.test.js\"",
     "db:bootstrap": "node --import tsx src/database/bootstrap-cli.ts",
     "build:test": "tsc -p tsconfig.test.json",
-    "db:demo": "node --import tsx src/database/demo-cli.ts"
+    "db:demo": "node --import tsx src/database/demo-cli.ts",
+    "worker:notifications": "node dist/notifications/notification-worker-cli.js",
+    "dev:worker": "node --import tsx src/notifications/notification-worker-cli.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",

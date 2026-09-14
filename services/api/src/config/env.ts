@@ -58,6 +58,31 @@ export const envSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((value) => value === 'true'),
+
+  /**
+   * Notification delivery (§33, §58).
+   *
+   * A channel with no gateway configured falls back to the logging sender,
+   * which `ALLOW_SANDBOX_ADAPTERS` refuses in production - so a production
+   * deployment that forgot to configure SMS reports nothing sent rather than
+   * everything delivered.
+   */
+  SMS_GATEWAY_URL: z.string().url().optional(),
+  EMAIL_GATEWAY_URL: z.string().url().optional(),
+  PUSH_GATEWAY_URL: z.string().url().optional(),
+  NOTIFICATION_GATEWAY_TOKEN: z.string().optional(),
+  NOTIFICATION_GATEWAY_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  /** Attempts before a message is abandoned as FAILED. */
+  NOTIFICATION_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
+  /** How long a claimed message stays invisible before another worker may take it. */
+  NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS: durationSeconds.default(300),
+  /** Run the delivery sweep inside the API process. Off where a worker runs separately. */
+  NOTIFICATION_WORKER_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  NOTIFICATION_WORKER_INTERVAL_SECONDS: durationSeconds.default(30),
+  NOTIFICATION_WORKER_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(25),
 });
 
 export type Env = z.infer<typeof envSchema>;

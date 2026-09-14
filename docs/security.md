@@ -209,6 +209,41 @@ Two exceptions are deliberate and each has a test:
   authorised are a separate read and stay refused — that is the access closing
   was meant to end.
 
+## What leaves the platform
+
+A notification is the one thing the platform sends to somebody rather than
+waiting to be asked for. That makes it the one place where a control can be
+undone by convenience: it is very easy to write a helpful SMS that tells whoever
+is holding the handset which agency is looking at its owner.
+
+So the channel decides what the message may carry, and a catalogue of constants
+decides the channel. `IN_APP` and `DASHBOARD` stay inside the platform behind
+authentication and carry the detail; `SMS`, `EMAIL` and `PUSH` carry the
+template's notice and nothing else — no name, no reference, no description of
+what happened.
+
+- **One producer.** `NotificationsService.enqueue` is the only path that creates
+  a notification. Before it, every service wrote its own `INSERT` and chose its
+  own channel and body.
+- **The sender sees an address and a string.** It is handed no PCID, no record
+  and no template context, so there is no path by which a gateway integration
+  can start sending more than the body it was given.
+- **No passphrase on any channel.** A passphrase is handed over in person; the
+  notice for a new account says so rather than being silent about it.
+- **Suppression is recorded.** A resident with no telephone number is not an
+  error, and the row says `SUPPRESSED` with a reason rather than disappearing.
+- **The operations view discloses nothing.** Counts, causes and template keys.
+  No body, no subject, no recipient — the screen is reachable by a technical role
+  that holds no entitlement to citizen data at all (§7), and a delivery queue
+  showing message bodies would be a second copy of every inbox.
+- **A sandbox sender cannot run in production.** With no gateway configured and
+  `ALLOW_SANDBOX_ADAPTERS` false, the worker reports no sender rather than
+  logging every message and claiming a hundred per cent delivery.
+
+`services/api/test/unit/notifications.test.ts` holds the catalogue to the rule:
+a notice that interpolates anything fails, so does one carrying a reference or a
+field path, and so does one too long for a single message.
+
 ## The portals
 
 Each portal is a separate trust boundary and is treated as one. All four are

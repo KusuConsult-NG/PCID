@@ -16,6 +16,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { expect, test as setup } from '@playwright/test';
 
 import {
+  ADMINISTRATOR_STATE,
   API_BASE_URL,
   API_DIRECTORY,
   ARTEFACT_DIRECTORY,
@@ -126,3 +127,32 @@ async function presentSecondFactor(
   }
   throw new Error('the authenticator code was refused three times');
 }
+
+/**
+ * The platform administrator, who is not an officer.
+ *
+ * Bootstrapped rather than created at a desk, and made to change the passphrase
+ * all the same: the bootstrap passphrase is in a deployment script, which is a
+ * place two people can read it from, so the account is flagged like any other.
+ */
+setup('the platform administrator signs in and chooses a passphrase', async ({ page }) => {
+  setup.setTimeout(90_000);
+  const demo = JSON.parse(readFileSync(CREDENTIALS_FILE, 'utf8')) as DemoCredentials;
+
+  await page.goto('/sign-in');
+  await page.getByLabel('Work email address').fill(demo.administrator.email);
+  await page.getByLabel('Passphrase', { exact: true }).fill(demo.administrator.password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+
+  await expect(page).toHaveURL(/\/sign-in\/verify$/);
+  await presentSecondFactor(page, demo.administrator.totpSecret);
+
+  await expect(page).toHaveURL(/\/change-passphrase$/);
+  await page.getByLabel('Current passphrase').fill(demo.administrator.password);
+  await page.getByLabel('New passphrase', { exact: true }).fill(CHOSEN_PASSPHRASE);
+  await page.getByLabel('Type the new passphrase again').fill(CHOSEN_PASSPHRASE);
+  await page.getByRole('button', { name: 'Save passphrase' }).click();
+
+  await expect(page).toHaveURL(/\/home/);
+  await page.context().storageState({ path: ADMINISTRATOR_STATE });
+});

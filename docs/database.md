@@ -17,21 +17,43 @@ npm run db:migrate    # idempotent
 npm run db:seed       # reference data; also idempotent
 ```
 
-| File                           | Contents                                                                                                              |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `0001_reference_data`          | Extensions, LGAs, wards, communities, reference sequences                                                             |
-| `0002_agencies_and_iam`        | Agency registry, roles, users, sessions, MFA, API clients                                                             |
-| `0003_audit`                   | The append-only hash-chained audit trail                                                                              |
-| `0004_citizen_registry`        | PCID allocation, citizens, emergency contacts, registration, duplicates, corrections                                  |
-| `0005_linked_records`          | Property, vehicle, business, licence, revenue projections; data sources, sync jobs, conflicts; the relationship graph |
-| `0006_public_safety`           | Incidents, dispatch, response units, cases, missing and unidentified persons, matches                                 |
-| `0007_authorization_workflows` | Access requests, break-glass grants, alert rules, alerts, notifications                                               |
-| `0008_database_roles`          | `pcid_app` and `pcid_readonly` privileges                                                                             |
-| `0009_postgis_optional`        | PostGIS acceleration where available; a portable great-circle function otherwise                                      |
+| File                             | Contents                                                                                                              |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `0001_reference_data`            | Extensions, LGAs, wards, communities, reference sequences                                                             |
+| `0002_agencies_and_iam`          | Agency registry, roles, users, sessions, MFA, API clients                                                             |
+| `0003_audit`                     | The append-only hash-chained audit trail                                                                              |
+| `0004_citizen_registry`          | PCID allocation, citizens, emergency contacts, registration, duplicates, corrections                                  |
+| `0005_linked_records`            | Property, vehicle, business, licence, revenue projections; data sources, sync jobs, conflicts; the relationship graph |
+| `0006_public_safety`             | Incidents, dispatch, response units, cases, missing and unidentified persons, matches                                 |
+| `0007_authorization_workflows`   | Access requests, break-glass grants, alert rules, alerts, notifications                                               |
+| `0008_database_roles`            | `pcid_app` and `pcid_readonly` privileges                                                                             |
+| `0009_postgis_optional`          | PostGIS acceleration where available; a portable great-circle function otherwise                                      |
+| `0010_citizen_portal`            | Credentials, verification tokens, and the resident's self-service state                                               |
+| `0011_audit_chain_serialisation` | The locked chain head that makes the audit chain correct under concurrency                                            |
+| `0012_notification_delivery`     | Templates, backoff, suppression, deduplication, and the per-attempt delivery record                                   |
 
 ## Invariants held by the database
 
 These are the guarantees that do not depend on application code being correct.
+
+### A message is never sent twice, and never sent for ever
+
+`notification.dedupe_key` carries a partial unique index, so a producer that is
+retried — a request replayed, a sync run again — queues nothing the second time
+rather than sending somebody the same thing twice.
+
+The worker claims with `FOR UPDATE SKIP LOCKED` inside a transaction that also
+moves the row to `SENDING`, so two workers never take the same message however
+many are running. A worker killed between the claim and the send leaves a row in
+`SENDING`; `next_attempt_at` is what brings it back, rather than a lock with
+nobody left to clear it.
+
+`notification_delivery_attempt` is append-only at the privilege level as well as
+in intent: `pcid_app` may insert and select and nothing else. An operator
+reading "it failed four times" is reading four rows, not a counter somebody
+could quietly revise. The table records the outcome and the gateway's reference
+and never the body — the body is on the notification, and copying it here would
+put the same personal information in two places with two retention rules.
 
 ### The audit trail cannot be rewritten, or forked
 

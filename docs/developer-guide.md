@@ -48,6 +48,8 @@ packages/policy      The engine. Depends on contracts only. No I/O.
 packages/portal-kit  What the portals share: the sealed session, the API client,
                      the form controls, the design system. No platform logic.
 services/api         Everything else. Depends on contracts and policy.
+                     Also carries the notification worker, which shares its
+                     configuration and database code and serves no HTTP.
 apps/portal          The citizen portal. Depends on portal-kit and on the API
                      over HTTP; on nothing else in this repository.
 apps/government      The government portal. The same.
@@ -64,7 +66,8 @@ exhaustively without a database, and a single import would end that.
 ```bash
 npm run test:unit                                    # contracts, policy, security primitives
 npm run test:integration --workspace services/api    # the API against a real database
-npm run test:e2e                                     # the portal, in a real browser
+npm run test:e2e                                     # every portal, in a real browser
+npm run worker:notifications                         # the delivery worker, standalone
 npm run verify                                       # format, lint, typecheck, unit + integration
 ```
 
@@ -267,6 +270,40 @@ For an unexpected denial, the order of suspicion: is the agency active with a
 signed agreement; is the authenticator confirmed; does a role grant the action; is
 the purpose one that action allows; is the field catalogued for that purpose; is
 there a case or incident and is the account on it.
+
+## Sending somebody a notification
+
+Never write to the `notification` table. Call the service:
+
+```ts
+await this.notifications.enqueue({
+  template: 'CORRECTION_DECIDED',
+  recipientType: 'CITIZEN',
+  recipientId: pcid,
+  subject: `Your correction request ${reference} has been applied`,
+  detail: note,
+  dedupeKey: `correction-decided:${reference}`,
+});
+```
+
+Three things follow from that and are worth knowing before you reach for it:
+
+- **You supply the detail; the channel decides whether it is used.** In the
+  portal the resident reads your `detail`. On SMS and email they read the
+  template's one-line notice, which is a constant and says nothing about
+  anybody. If the template you need does not exist yet, add one to
+  [`packages/contracts/src/notifications.ts`](../packages/contracts/src/notifications.ts)
+  — do not reuse `GENERAL` and put the detail in the subject.
+- **Pass a `dedupeKey` if the producer can run twice.** A request replayed or a
+  sync run again must not send somebody the same thing twice, and the key is the
+  only thing standing between them and two identical messages.
+- **Pass the transaction runner if the message should roll back with the work.**
+  `enqueue(input, runner)` inside a `db.transaction` means that if the decision
+  does not commit, neither does telling somebody it was decided.
+
+The worker is a plain method — `NotificationDeliveryWorker.sweep()` — rather than
+a timer inside a class, so a test can drive it directly. Run it standalone with
+`npm run dev:worker`.
 
 ## Working on a portal
 

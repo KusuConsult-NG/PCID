@@ -10,8 +10,8 @@
           ┌─────────────┴──────────────┐
    Citizen portal              API instance
    Government portal           API instance          (stateless, ≥2 each)
-   Security agency portal
-   Emergency response portal
+   Security agency portal      Notification worker
+   Emergency response portal   (≥1, no HTTP surface)
           └─────────────┬──────────────┘
                         │
         ┌───────────────┼────────────────┐
@@ -154,6 +154,35 @@ The portal images need no secret to build. Their configuration is read at the
 point of use, so the same artefact is promoted from staging to production
 unchanged.
 
+## The notification worker
+
+Delivery runs as its own process:
+
+```bash
+npm run worker:notifications
+```
+
+It is the same image as the API with a different command — it serves no HTTP,
+opens no port and holds no session — and `docker-compose.yml` shows the shape.
+Run at least one; run more if the queue grows. Messages are claimed with
+`FOR UPDATE SKIP LOCKED`, so the number of replicas is an operational decision
+rather than a correctness one, and a worker killed mid-send leaves its message
+claimable again after `NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS` rather than
+stuck.
+
+A single-box deployment can set `NOTIFICATION_WORKER_ENABLED=true` and let the
+API sweep on a timer instead. That is the exception, not the shape: a burst of
+messages then competes with the request path for the same event loop.
+
+Configure a gateway for every channel you intend to use. A channel with none
+falls back to the logging sender, which `ALLOW_SANDBOX_ADAPTERS=false` refuses —
+so a deployment that forgot to configure SMS reports nothing sent rather than
+everything delivered, which is the safe direction to fail in.
+
+Watch two things: the depth of `QUEUED`, and the count of `FAILED`. The
+administration page in the government portal shows both, grouped by cause, along
+with the oldest message still waiting.
+
 ## Health checks
 
 | Endpoint               | Use                                                                                    |
@@ -221,6 +250,8 @@ Deliberately not a formality:
 - [ ] Only the citizen portal is reachable from the public internet
 - [ ] `*_ALLOWED_ORIGINS` list exactly each portal's public origins
 - [ ] Every portal served over TLS, so their session cookies are accepted as `Secure`
+- [ ] A gateway is configured for every channel in use, and a test message arrived
+- [ ] At least one notification worker is running, and the queue depth is on a dashboard
 - [ ] Load testing performed — **not yet done**
 - [ ] Independent security assessment performed — **not yet done**
 

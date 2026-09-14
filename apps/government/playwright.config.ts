@@ -9,6 +9,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 import {
+  ADMINISTRATOR_STATE,
   API_BASE_URL,
   API_PORT,
   PORTAL_BASE_URL,
@@ -60,6 +61,14 @@ export default defineConfig({
       dependencies: ['registration', 'counter'],
       testMatch: /oversight\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], storageState: STATE_FILES.DATA_PROTECTION_OFFICER },
+    },
+    {
+      // The platform administrator, who is not an officer: a technical role that
+      // holds no entitlement to citizen data at all.
+      name: 'administration',
+      dependencies: ['oversight'],
+      testMatch: /delivery\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], storageState: ADMINISTRATOR_STATE },
     },
     {
       // Last, so the pages it checks hold the records the journeys created.

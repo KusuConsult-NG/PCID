@@ -193,3 +193,28 @@ export interface DataSource {
   readonly lastError: string | null;
   readonly lastSync: { readonly status: string | null; readonly finishedAt: string | null };
 }
+
+/**
+ * The delivery queue, as an operator sees it.
+ *
+ * No bodies, no subjects and no recipients — the API does not return them, and
+ * this type exists partly to say so in a place somebody will read before adding
+ * a column.
+ */
+export interface NotificationQueue {
+  readonly counts: readonly { channel: string; status: string; count: number }[];
+  readonly oldestWaitingAt: string | null;
+  readonly abandoned: readonly {
+    readonly id: string;
+    readonly channel: string;
+    readonly template: string;
+    readonly attempts: number;
+    readonly lastError: string | null;
+    readonly queuedAt: string;
+  }[];
+  readonly failuresLast24Hours: readonly {
+    readonly channel: string;
+    readonly detail: string | null;
+    readonly count: number;
+  }[];
+}

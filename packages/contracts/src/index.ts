@@ -13,6 +13,7 @@ export * from './identity';
 export * from './integration';
 export * from './locations';
 export * from './missing-persons';
+export * from './notifications';
 export * from './pcid';
 export * from './purpose';
 export * from './resources';
