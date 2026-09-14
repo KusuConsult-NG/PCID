@@ -424,6 +424,102 @@ export class IncidentsService {
     return { id: inserted.id };
   }
 
+  /**
+   * Put an officer on an incident.
+   *
+   * The emergency guide calls this "the normal path" for a responder who is not
+   * attached - ask control, it takes seconds - and until now there was no route
+   * that did it. Attachment by agency happens automatically when a unit is
+   * dispatched; this is the individual case: a paramedic from another service,
+   * an incident officer taking a handover, a commander joining a major incident.
+   *
+   * It is deliberately not itself incident-bound in the way a data read is: the
+   * engine authorises it as INCIDENT_UPDATE against the incident, so an officer
+   * already on it, or one whose agency is, can bring somebody in. That is the
+   * same reasoning as case assignment - an incident nobody can be added to is an
+   * incident that stalls when its officer goes off shift.
+   */
+  async attachOfficer(
+    actor: AuthenticatedActor,
+    reference: string,
+    userId: string,
+    role: string,
+    context: RequestContext,
+  ): Promise<{ incidentNumber: string; userId: string; role: string }> {
+    const row = await this.findByReference(reference);
+    await this.policy.authorize({
+      actor,
+      action: 'INCIDENT_UPDATE',
+      purpose: 'EMERGENCY_RESPONSE',
+      resource: {
+        type: 'INCIDENT',
+        id: row?.id ?? null,
+        classification: 'CONFIDENTIAL',
+        subjectPcid: null,
+        lgaCode: row?.lga_code ?? null,
+      },
+      incidentRef: reference,
+      context,
+      auditDetail: { attachedUserId: userId, role },
+    });
+    if (row === null) throw AppError.notFoundOrNotPermitted(`no incident ${reference}`);
+    if (!ACTIVE_INCIDENT_STATUSES.includes(row.status)) {
+      throw AppError.conflict(
+        `Incident ${row.incident_number} is ${row.status.toLowerCase()} and authorises no further access.`,
+      );
+    }
+
+    return this.db.transaction(async (runner) => {
+      const officer = await runner.queryOne<{ full_name: string }>(
+        'SELECT full_name FROM government_user WHERE id = $1 AND status = $2',
+        [userId, 'ACTIVE'],
+      );
+      // The same opaque answer as everywhere else: an account that does not
+      // exist and one that is suspended must not be distinguishable from here.
+      if (officer === null) throw AppError.notFoundOrNotPermitted(`no active user ${userId}`);
+
+      await runner.query(
+        `INSERT INTO incident_officer (incident_id, user_id, role, assigned_by)
+         VALUES ($1,$2,$3,$4)
+         ON CONFLICT (incident_id, user_id)
+         DO UPDATE SET role = EXCLUDED.role, released_at = NULL, assigned_at = now(),
+                       assigned_by = EXCLUDED.assigned_by`,
+        [row.id, userId, role, actor.subject.userId],
+      );
+      await this.appendTimeline(
+        runner,
+        row.id,
+        'OFFICER_ATTACHED',
+        `${officer.full_name} attached as ${role.toLowerCase().replace(/_/g, ' ')}.`,
+        { role },
+        actor,
+      );
+      await this.audit.record(
+        {
+          action: 'INCIDENT_UPDATE',
+          outcome: 'PERMITTED',
+          actorType: actor.subject.actorType,
+          actorId: actor.subject.userId,
+          actorDisplay: actor.displayName,
+          agencyId: actor.subject.agencyId,
+          agencyCode: actor.agencyCode,
+          roles: actor.subject.roles,
+          purpose: 'EMERGENCY_RESPONSE',
+          resourceType: 'INCIDENT',
+          resourceId: row.id,
+          incidentId: row.id,
+          incidentNumber: row.incident_number,
+          correlationId: context.correlationId,
+          ipAddress: context.ipAddress,
+          // The officer attached, and what as. Never anything about a casualty.
+          detail: { attachedUserId: userId, role },
+        },
+        runner,
+      );
+      return { incidentNumber: row.incident_number, userId, role };
+    });
+  }
+
   async findByReference(reference: string): Promise<IncidentRow | null> {
     return this.db.queryOne<IncidentRow>(
       `SELECT id, incident_number, type, severity, status, description, address_text,

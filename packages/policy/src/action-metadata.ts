@@ -177,6 +177,27 @@ export const CASE_RECORD_ACTIONS: ReadonlySet<Action> = new Set<Action>([
 ]);
 
 /**
+ * Actions that address an incident record itself.
+ *
+ * The same reasoning as CASE_RECORD_ACTIONS, and for a sharper reason: putting
+ * an officer on an incident is what opens the casualties' emergency profiles to
+ * them. An account holding INCIDENT_UPDATE but attached to nothing must not be
+ * able to attach itself, or anyone else, to somebody else's incident.
+ *
+ * DISPATCH_CREATE is deliberately absent. Sending your own unit is how an
+ * agency joins an incident it did not open, and binding it would make a
+ * multi-agency response impossible to start: the ambulance service could never
+ * answer a police-led incident. It remains governed by role, purpose,
+ * jurisdiction and agency standing, and it attaches only the agency whose unit
+ * was actually sent.
+ */
+export const INCIDENT_RECORD_ACTIONS: ReadonlySet<Action> = new Set<Action>([
+  'INCIDENT_VIEW',
+  'INCIDENT_UPDATE',
+  'INCIDENT_CLOSE',
+]);
+
+/**
  * Reads that are exempt from case and incident binding.
  *
  * The missing-person and unidentified-person registers *are* the investigative

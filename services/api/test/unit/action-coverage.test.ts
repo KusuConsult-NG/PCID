@@ -43,7 +43,6 @@ describe('authorisation coverage', () => {
    */
   const AWAITING_A_SURFACE: Readonly<Record<string, string>> = Object.freeze({
     RELATIONSHIP_VIEW: 'household and relationship records',
-    RESPONSE_UNIT_MANAGE: 'emergency response portal',
     IMPORT_RUN: 'bulk registration import',
     ADMIN_ROLE_MANAGE: 'role administration',
     ADMIN_REFERENCE_DATA_MANAGE: 'reference data administration',

@@ -36,6 +36,18 @@ const DISPATCH_TRANSITIONS: Readonly<Record<DispatchStatus, readonly DispatchSta
     STOOD_DOWN: [],
   });
 
+/**
+ * The statuses fleet administration may set.
+ *
+ * A unit that is out on a job is moved by the dispatch workflow, which knows
+ * what is actually happening to it.
+ */
+const ADMINISTRABLE_UNIT_STATUSES: readonly ResponseUnitStatus[] = Object.freeze([
+  'AVAILABLE',
+  'OFFLINE',
+  'BUSY',
+]);
+
 const UNIT_STATUS_FOR_DISPATCH: Readonly<Record<DispatchStatus, ResponseUnitStatus>> =
   Object.freeze({
     ASSIGNED: 'DISPATCHED',
@@ -121,6 +133,183 @@ export class DispatchService {
       where.params,
     );
     return rows.map(toUnit);
+  }
+
+  /**
+   * Register a response unit.
+   *
+   * Fleet administration, not citizen data: a unit is a vehicle and a crew. It
+   * is authorised as RESPONSE_UNIT_MANAGE and nothing about it widens anybody's
+   * access to a person - which is why it can be held by a technical
+   * administrator role that deliberately carries no data entitlement at all.
+   *
+   * A unit belongs to the registering account's agency unless one is named
+   * explicitly, and the platform does not let this route set a position: where
+   * a unit is, is something the unit reports.
+   */
+  async createUnit(
+    actor: AuthenticatedActor,
+    input: {
+      unitCode: string;
+      agencyId?: string;
+      type: string;
+      homeLgaCode?: string | null;
+      homeWardCode?: string | null;
+      capabilities?: readonly string[];
+      contactPhone?: string | null;
+      status?: 'AVAILABLE' | 'OFFLINE';
+    },
+    context: RequestContext,
+  ): Promise<Record<string, unknown>> {
+    const agencyId = input.agencyId ?? actor.subject.agencyId;
+    await this.policy.authorize({
+      actor,
+      action: 'RESPONSE_UNIT_MANAGE',
+      purpose: 'SYSTEM_ADMINISTRATION',
+      resource: {
+        type: 'RESPONSE_UNIT',
+        id: null,
+        classification: 'INTERNAL',
+        subjectPcid: null,
+        lgaCode: input.homeLgaCode ?? null,
+      },
+      context,
+      auditDetail: { unitCode: input.unitCode, unitType: input.type },
+    });
+    if (agencyId === null) {
+      throw AppError.validation('This account has no agency, so it must name the owning agency.');
+    }
+
+    const unitCode = input.unitCode.toUpperCase();
+    const existing = await this.db.queryOne<{ id: string }>(
+      'SELECT id FROM response_unit WHERE unit_code = $1',
+      [unitCode],
+    );
+    if (existing !== null) throw AppError.conflict(`Unit ${unitCode} is already registered.`);
+
+    const row = await this.db.queryOne<ResponseUnitRow>(
+      `INSERT INTO response_unit (unit_code, agency_id, type, status, home_lga_code, home_ward_code,
+                                  capabilities, contact_phone)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       RETURNING *`,
+      [
+        unitCode,
+        agencyId,
+        input.type,
+        input.status ?? 'OFFLINE',
+        input.homeLgaCode ?? null,
+        input.homeWardCode ?? null,
+        input.capabilities ?? [],
+        input.contactPhone ?? null,
+      ],
+    );
+    if (row === null) throw new Error('response unit insert returned no row');
+
+    await this.audit.record({
+      action: 'RESPONSE_UNIT_MANAGE',
+      outcome: 'PERMITTED',
+      actorType: actor.subject.actorType,
+      actorId: actor.subject.userId,
+      actorDisplay: actor.displayName,
+      agencyId: actor.subject.agencyId,
+      agencyCode: actor.agencyCode,
+      roles: actor.subject.roles,
+      purpose: 'SYSTEM_ADMINISTRATION',
+      resourceType: 'RESPONSE_UNIT',
+      resourceId: row.id,
+      correlationId: context.correlationId,
+      ipAddress: context.ipAddress,
+      detail: { change: 'REGISTERED', unitCode },
+    });
+    return toUnit(row);
+  }
+
+  /**
+   * Change a unit.
+   *
+   * The operational statuses are not settable here. A unit is marked dispatched,
+   * en route or on scene by the dispatch workflow, which knows whether it is
+   * true; a fleet screen that could write them would let somebody mark an
+   * ambulance available while it is carrying a patient. Only AVAILABLE and
+   * OFFLINE - putting a unit into service and taking it out - are administration.
+   */
+  async updateUnit(
+    actor: AuthenticatedActor,
+    unitCode: string,
+    input: {
+      type?: string;
+      homeLgaCode?: string | null;
+      homeWardCode?: string | null;
+      capabilities?: readonly string[];
+      contactPhone?: string | null;
+      status?: 'AVAILABLE' | 'OFFLINE';
+    },
+    context: RequestContext,
+  ): Promise<Record<string, unknown>> {
+    const current = await this.db.queryOne<ResponseUnitRow>(
+      'SELECT * FROM response_unit WHERE unit_code = $1',
+      [unitCode.toUpperCase()],
+    );
+    await this.policy.authorize({
+      actor,
+      action: 'RESPONSE_UNIT_MANAGE',
+      purpose: 'SYSTEM_ADMINISTRATION',
+      resource: {
+        type: 'RESPONSE_UNIT',
+        id: current?.id ?? null,
+        classification: 'INTERNAL',
+        subjectPcid: null,
+        lgaCode: current?.home_lga_code ?? null,
+      },
+      context,
+      auditDetail: { unitCode },
+    });
+    if (current === null) throw AppError.notFoundOrNotPermitted(`no response unit ${unitCode}`);
+
+    if (input.status !== undefined && !ADMINISTRABLE_UNIT_STATUSES.includes(current.status)) {
+      throw AppError.conflict(
+        `Unit ${current.unit_code} is ${current.status.toLowerCase()} on a live dispatch; ` +
+          'stand it down from the incident rather than from here.',
+      );
+    }
+
+    const columns: string[] = [];
+    const values: unknown[] = [current.id];
+    const set = (column: string, value: unknown): void => {
+      values.push(value);
+      columns.push(`${column} = $${values.length}`);
+    };
+    if (input.type !== undefined) set('type', input.type);
+    if (input.homeLgaCode !== undefined) set('home_lga_code', input.homeLgaCode);
+    if (input.homeWardCode !== undefined) set('home_ward_code', input.homeWardCode);
+    if (input.capabilities !== undefined) set('capabilities', input.capabilities);
+    if (input.contactPhone !== undefined) set('contact_phone', input.contactPhone);
+    if (input.status !== undefined) set('status', input.status);
+    if (columns.length === 0) throw AppError.validation('Supply at least one field to update.');
+
+    const row = await this.db.queryOne<ResponseUnitRow>(
+      `UPDATE response_unit SET ${columns.join(', ')}, updated_at = now() WHERE id = $1 RETURNING *`,
+      values,
+    );
+    if (row === null) throw new Error('response unit update returned no row');
+
+    await this.audit.record({
+      action: 'RESPONSE_UNIT_MANAGE',
+      outcome: 'PERMITTED',
+      actorType: actor.subject.actorType,
+      actorId: actor.subject.userId,
+      actorDisplay: actor.displayName,
+      agencyId: actor.subject.agencyId,
+      agencyCode: actor.agencyCode,
+      roles: actor.subject.roles,
+      purpose: 'SYSTEM_ADMINISTRATION',
+      resourceType: 'RESPONSE_UNIT',
+      resourceId: row.id,
+      correlationId: context.correlationId,
+      ipAddress: context.ipAddress,
+      detail: { change: 'UPDATED', unitCode: row.unit_code, fields: Object.keys(input) },
+    });
+    return toUnit(row);
   }
 
   async dispatch(

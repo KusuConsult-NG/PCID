@@ -5,13 +5,16 @@ import type { Request } from 'express';
 import { contextOf } from '../common/correlation';
 import {
   createIncidentSchema,
+  createResponseUnitSchema,
   dispatchSchema,
   dispatchStatusSchema,
   incidentListSchema,
+  incidentOfficerSchema,
   incidentPersonSchema,
   incidentStatusSchema,
   unitListSchema,
   unitPositionSchema,
+  updateResponseUnitSchema,
 } from '../common/dto';
 import { documentRoute } from '../common/openapi/registry';
 import { validate } from '../common/zod-validation.pipe';
@@ -79,6 +82,20 @@ documentRoute({
 });
 documentRoute({
   method: 'post',
+  path: '/api/v1/incidents/:reference/officers',
+  tag: 'Emergency',
+  summary: 'Attach an officer to an incident',
+  description:
+    'The ordinary answer to "I am not attached": control attaches you, and it takes seconds. ' +
+    'Attachment by agency happens on its own when a unit is dispatched; this is the individual ' +
+    'case - a paramedic from another service, an incident officer taking a handover, a commander ' +
+    'joining a major incident. A closed incident authorises nothing, so nobody can be added to one.',
+  parameters: [{ name: 'reference', in: 'path', description: 'Incident number.' }],
+  body: incidentOfficerSchema,
+  actions: ['INCIDENT_UPDATE'],
+});
+documentRoute({
+  method: 'post',
   path: '/api/v1/incidents/:reference/dispatch',
   tag: 'Emergency',
   summary: 'Dispatch a response unit',
@@ -114,6 +131,30 @@ documentRoute({
     },
   ],
   actions: ['RESPONSE_UNIT_VIEW'],
+});
+documentRoute({
+  method: 'post',
+  path: '/api/v1/response-units',
+  tag: 'Emergency',
+  summary: 'Register a response unit',
+  description:
+    'Fleet administration: a unit is a vehicle and a crew, and nothing here is citizen data. ' +
+    'There is no position field - where a unit is, is something the unit reports.',
+  body: createResponseUnitSchema,
+  actions: ['RESPONSE_UNIT_MANAGE'],
+});
+documentRoute({
+  method: 'patch',
+  path: '/api/v1/response-units/:unitCode',
+  tag: 'Emergency',
+  summary: 'Change a response unit, or take it in and out of service',
+  description:
+    'Status is limited to AVAILABLE and OFFLINE. The operational statuses belong to the dispatch ' +
+    'workflow, which knows whether they are true; a fleet screen that could write them would let ' +
+    'somebody mark an ambulance available while it is carrying a patient.',
+  parameters: [{ name: 'unitCode', in: 'path', description: 'Unit code.' }],
+  body: updateResponseUnitSchema,
+  actions: ['RESPONSE_UNIT_MANAGE'],
 });
 documentRoute({
   method: 'post',
@@ -217,6 +258,23 @@ export class EmergencyController {
     );
   }
 
+  @Post('incidents/:reference/officers')
+  async attachOfficer(
+    @Actor() actor: AuthenticatedActor,
+    @Param('reference') reference: string,
+    @Body() body: unknown,
+    @Req() request: Request,
+  ): Promise<unknown> {
+    const input = validate(incidentOfficerSchema, body);
+    return this.incidents.attachOfficer(
+      actor,
+      reference,
+      input.userId,
+      input.role,
+      contextOf(request),
+    );
+  }
+
   @Post('incidents/:reference/dispatch')
   async dispatchUnit(
     @Actor() actor: AuthenticatedActor,
@@ -265,6 +323,52 @@ export class EmergencyController {
         ...(input.agencyId !== undefined ? { agencyId: input.agencyId } : {}),
         ...(input.lgaCode !== undefined ? { lgaCode: input.lgaCode } : {}),
         ...(input.nearIncident !== undefined ? { nearIncident: input.nearIncident } : {}),
+      },
+      contextOf(request),
+    );
+  }
+
+  @Post('response-units')
+  async createUnit(
+    @Actor() actor: AuthenticatedActor,
+    @Body() body: unknown,
+    @Req() request: Request,
+  ): Promise<unknown> {
+    const input = validate(createResponseUnitSchema, body);
+    return this.dispatch.createUnit(
+      actor,
+      {
+        unitCode: input.unitCode,
+        ...(input.agencyId !== undefined ? { agencyId: input.agencyId } : {}),
+        type: input.type,
+        ...(input.homeLgaCode !== undefined ? { homeLgaCode: input.homeLgaCode } : {}),
+        ...(input.homeWardCode !== undefined ? { homeWardCode: input.homeWardCode } : {}),
+        ...(input.capabilities !== undefined ? { capabilities: input.capabilities } : {}),
+        ...(input.contactPhone !== undefined ? { contactPhone: input.contactPhone } : {}),
+        ...(input.status !== undefined ? { status: input.status as 'AVAILABLE' | 'OFFLINE' } : {}),
+      },
+      contextOf(request),
+    );
+  }
+
+  @Patch('response-units/:unitCode')
+  async updateUnit(
+    @Actor() actor: AuthenticatedActor,
+    @Param('unitCode') unitCode: string,
+    @Body() body: unknown,
+    @Req() request: Request,
+  ): Promise<unknown> {
+    const input = validate(updateResponseUnitSchema, body);
+    return this.dispatch.updateUnit(
+      actor,
+      unitCode,
+      {
+        ...(input.type !== undefined ? { type: input.type } : {}),
+        ...(input.homeLgaCode !== undefined ? { homeLgaCode: input.homeLgaCode } : {}),
+        ...(input.homeWardCode !== undefined ? { homeWardCode: input.homeWardCode } : {}),
+        ...(input.capabilities !== undefined ? { capabilities: input.capabilities } : {}),
+        ...(input.contactPhone !== undefined ? { contactPhone: input.contactPhone } : {}),
+        ...(input.status !== undefined ? { status: input.status as 'AVAILABLE' | 'OFFLINE' } : {}),
       },
       contextOf(request),
     );

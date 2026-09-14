@@ -66,6 +66,38 @@ const AGENCIES = [
   },
 ] as const;
 
+/** A small fleet, so the emergency portal has something to dispatch. */
+const DEMO_UNITS = [
+  {
+    unitCode: 'AMB-JOS-01',
+    type: 'AMBULANCE',
+    lgaCode: 'PL-JNO',
+    capabilities: ['PARAMEDIC', 'DEFIBRILLATOR'],
+    phone: '08035550101',
+  },
+  {
+    unitCode: 'AMB-JOS-02',
+    type: 'AMBULANCE',
+    lgaCode: 'PL-JNO',
+    capabilities: ['PARAMEDIC'],
+    phone: '08035550102',
+  },
+  {
+    unitCode: 'FIRE-JOS-01',
+    type: 'FIRE_TRUCK',
+    lgaCode: 'PL-JNO',
+    capabilities: ['EXTRICATION', 'WATER_TENDER'],
+    phone: '08035550103',
+  },
+  {
+    unitCode: 'RESCUE-BKR-01',
+    type: 'RESCUE_TEAM',
+    lgaCode: 'PL-JSO',
+    capabilities: ['ROPE_RESCUE', 'FLOOD_RESCUE'],
+    phone: '08035550104',
+  },
+] as const;
+
 const OFFICERS: readonly DemoOfficer[] = [
   {
     email: 'registrar@demo.plateaustate.gov.ng',
@@ -115,6 +147,22 @@ const OFFICERS: readonly DemoOfficer[] = [
     agencyCode: 'PLT-POLICE',
     roles: ['MISSING_PERSON_OFFICER'],
     clearance: 'LAW_ENFORCEMENT_RESTRICTED',
+  },
+  {
+    email: 'responder@demo.plateaustate.gov.ng',
+    fullName: 'Ambulance Crew',
+    agencyCode: 'PLT-EMS',
+    roles: ['EMERGENCY_RESPONDER'],
+    clearance: 'CONFIDENTIAL',
+  },
+  {
+    // Fleet administration. A technical role by design: it registers vehicles
+    // and crews and carries no entitlement to anybody's record.
+    email: 'fleet@demo.plateaustate.gov.ng',
+    fullName: 'Fleet Office',
+    agencyCode: 'PLT-EMS',
+    roles: ['SECURITY_ADMINISTRATOR'],
+    clearance: 'INTERNAL',
   },
 ];
 
@@ -185,6 +233,7 @@ async function main(): Promise<void> {
 
     const officerPasswords = new Map<string, string>();
     const officerAuthenticators = new Map<string, string>();
+    const officerIds = new Map<string, string>();
     for (const officer of OFFICERS) {
       const password = `Zq7${randomBytes(12).toString('base64url')}Xm4`;
       const created = await api.post<{ id: string; totpSecret: string }>(
@@ -204,6 +253,7 @@ async function main(): Promise<void> {
       );
       officerPasswords.set(officer.email, password);
       officerAuthenticators.set(officer.email, created.totpSecret);
+      officerIds.set(officer.email, created.id);
       // Confirm the authenticator so the account is usable straight away.
       await db.transaction(async (runner) => {
         await runner.query(
@@ -327,6 +377,57 @@ async function main(): Promise<void> {
       foundAddress: 'Bukuru junction',
       foundLgaCode: 'PL-JSO',
     });
+
+    // Something for the emergency portal to show: a fleet, a live incident, and
+    // a unit on its way to it. Through the ordinary routes, as an ordinary
+    // control room would.
+    const fleetToken = await api.signInWithStoredSecret(
+      'fleet@demo.plateaustate.gov.ng',
+      officerPasswords.get('fleet@demo.plateaustate.gov.ng') as string,
+    );
+    for (const unit of DEMO_UNITS) {
+      await api.post(fleetToken, '/api/v1/response-units', {
+        unitCode: unit.unitCode,
+        type: unit.type,
+        homeLgaCode: unit.lgaCode,
+        capabilities: [...unit.capabilities],
+        contactPhone: unit.phone,
+        status: 'AVAILABLE',
+      });
+    }
+
+    const dispatcherToken = await api.signInWithStoredSecret(
+      'dispatcher@demo.plateaustate.gov.ng',
+      officerPasswords.get('dispatcher@demo.plateaustate.gov.ng') as string,
+    );
+    const incident = await api.post<{ incidentNumber: string }>(
+      dispatcherToken,
+      '/api/v1/incidents',
+      {
+        type: 'ROAD_ACCIDENT',
+        severity: 'CRITICAL',
+        description: 'Multi-vehicle collision with casualties on the Zaria Road.',
+        addressText: 'Zaria Road, near the Bauchi Road junction, Jos',
+        lgaCode: 'PL-JNO',
+        latitude: 9.9285,
+        longitude: 8.8921,
+        reporterContact: '08035550002',
+      },
+    );
+    await api.post(dispatcherToken, `/api/v1/incidents/${incident.incidentNumber}/dispatch`, {
+      unitCode: 'AMB-JOS-01',
+      note: 'Nearest available ambulance.',
+    });
+    // The responder attached individually, which is the path the guide calls
+    // "ask control" - the crew's agency is attached by the dispatch, but the
+    // handover to a named responder is its own act.
+    const responderUserId = officerIds.get('responder@demo.plateaustate.gov.ng');
+    if (responderUserId !== undefined) {
+      await api.post(dispatcherToken, `/api/v1/incidents/${incident.incidentNumber}/officers`, {
+        userId: responderUserId,
+        role: 'RESPONDER',
+      });
+    }
 
     // A message waiting in the portal inbox.
     await db.query(

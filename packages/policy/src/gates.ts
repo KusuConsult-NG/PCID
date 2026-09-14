@@ -15,6 +15,7 @@ import {
   CASE_LINKAGE_REQUIRED_ACTIONS,
   CASE_RECORD_ACTIONS,
   CITIZEN_DATA_ACTIONS,
+  INCIDENT_RECORD_ACTIONS,
   purposesForAction,
   resourceTypesForAction,
 } from './action-metadata';
@@ -403,11 +404,16 @@ export function caseBindingGate(request: PolicyRequest): GateResult {
 }
 
 export function incidentBindingGate(request: PolicyRequest): GateResult {
-  const { subject, action, purpose, incidentContext } = request;
+  const { subject, action, purpose, resource, incidentContext } = request;
+  // As with a case, the gate applies to the incident record itself only when a
+  // specific incident is addressed: a listing carries neither an incident
+  // reference nor a record id, and the service scopes it by jurisdiction.
+  const addressesOneIncident = incidentContext !== null || resource.id !== null;
   const applies =
     INCIDENT_BOUND_PURPOSES.includes(purpose) &&
     !BINDING_EXEMPT_ACTIONS.has(action) &&
-    CITIZEN_DATA_ACTIONS.has(action);
+    (CITIZEN_DATA_ACTIONS.has(action) ||
+      (INCIDENT_RECORD_ACTIONS.has(action) && addressesOneIncident));
   if (!applies) return null;
   if (subject.actorType === 'CITIZEN') return null;
 
@@ -419,7 +425,12 @@ export function incidentBindingGate(request: PolicyRequest): GateResult {
       'INCIDENT_BINDING',
     );
   }
-  if (!ACTIVE_INCIDENT_STATUSES.includes(incidentContext.status)) {
+  // Closing is the one act a finished incident still admits. An incident is
+  // resolved before it is closed, and resolved is not an active status, so a
+  // rule without this exception would leave every incident stuck one step short
+  // of closed with nothing able to finish it. Moving it back to a live status is
+  // INCIDENT_UPDATE and stays refused, so this does not reopen anything.
+  if (action !== 'INCIDENT_CLOSE' && !ACTIVE_INCIDENT_STATUSES.includes(incidentContext.status)) {
     return fail(
       'INCIDENT_BINDING',
       'INCIDENT_NOT_ACTIVE',

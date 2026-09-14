@@ -12,6 +12,7 @@ import {
   REGISTRATION_CHANNELS,
   RESOURCE_TYPES,
   RESPONSE_UNIT_STATUSES,
+  RESPONSE_UNIT_TYPES,
   SEXES,
   UNIDENTIFIED_PERSON_CONDITIONS,
 } from '@pcid/contracts';
@@ -148,6 +149,57 @@ export const dispatchStatusSchema = z.object({
 export const unitPositionSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
+});
+
+/* --- Emergency response: the fleet, and who is on an incident -------------- */
+
+/**
+ * Registering a response unit.
+ *
+ * A unit is a vehicle and a crew, not a person: nothing here is citizen data,
+ * and the position fields are absent on purpose. A unit's position is reported
+ * by the unit itself through `/response-units/:unitCode/position`, and there is
+ * no route by which an administrator sets where somebody is.
+ */
+export const createResponseUnitSchema = z.object({
+  unitCode: z
+    .string()
+    .min(2)
+    .max(32)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9-]*$/, 'Letters, digits and hyphens only.'),
+  agencyId: uuidSchema.optional(),
+  type: z.enum(RESPONSE_UNIT_TYPES as unknown as [string, ...string[]]),
+  homeLgaCode: z.string().max(16).nullish(),
+  homeWardCode: z.string().max(24).nullish(),
+  capabilities: z.array(z.string().min(2).max(64)).max(20).optional(),
+  contactPhone: z.string().max(32).nullish(),
+  status: z.enum(['AVAILABLE', 'OFFLINE']).optional(),
+});
+
+/**
+ * Changing a unit.
+ *
+ * `status` is limited to the two an administrator legitimately sets. The
+ * operational ones - dispatched, en route, on scene - belong to the dispatch
+ * workflow and are set by it; letting a fleet screen write them would let
+ * somebody mark an ambulance available while it is carrying a patient.
+ */
+export const updateResponseUnitSchema = z
+  .object({
+    type: z.enum(RESPONSE_UNIT_TYPES as unknown as [string, ...string[]]).optional(),
+    homeLgaCode: z.string().max(16).nullish(),
+    homeWardCode: z.string().max(24).nullish(),
+    capabilities: z.array(z.string().min(2).max(64)).max(20).optional(),
+    contactPhone: z.string().max(32).nullish(),
+    status: z.enum(['AVAILABLE', 'OFFLINE']).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'Supply at least one field to update.',
+  });
+
+export const incidentOfficerSchema = z.object({
+  userId: uuidSchema,
+  role: z.enum(['COMMANDER', 'INCIDENT_OFFICER', 'RESPONDER', 'OBSERVER']).default('RESPONDER'),
 });
 
 export const createCaseSchema = z.object({

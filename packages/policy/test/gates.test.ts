@@ -173,10 +173,138 @@ describe('access window gate', () => {
         action: 'INCIDENT_VIEW',
         purpose: 'EMERGENCY_RESPONSE',
         resource: resource('INCIDENT', { classification: 'INTERNAL', subjectPcid: null }),
+        // Opening one incident is incident-bound like anything else, so the
+        // dispatcher is on it. The subject of this test is the window.
+        incidentContext: incidentContext({ assignedUserIds: ['usr-001'] }),
       }),
       now: new Date('2026-03-04T01:00:00.000Z'), // 02:00 Lagos
     });
     assert.equal(inside.effect, 'PERMIT');
+  });
+});
+
+describe('incident binding gate (§9, §10)', () => {
+  // Attaching an officer to an incident is what opens the casualties' emergency
+  // profiles to them. If the act of attaching were itself unbound, any account
+  // holding INCIDENT_UPDATE could attach itself to any live incident in the
+  // state and read everybody on it - which is the whole control, undone by the
+  // one route that grants it.
+  test('the incident record is bound to the incident, not only the data read', () => {
+    const outsider = evaluate(
+      request({
+        subject: subject(['INCIDENT_OFFICER'], { userId: 'usr-outsider', agencyId: 'agy-fire' }),
+        action: 'INCIDENT_UPDATE',
+        purpose: 'EMERGENCY_RESPONSE',
+        resource: resource('INCIDENT', { classification: 'CONFIDENTIAL', subjectPcid: null }),
+        incidentContext: incidentContext({
+          assignedUserIds: ['usr-control'],
+          assignedAgencyIds: ['agy-ems'],
+        }),
+      }),
+    );
+    assert.equal(outsider.effect, 'DENY');
+    assert.equal(outsider.reasons[0]?.code, 'NOT_ASSIGNED_TO_INCIDENT');
+  });
+
+  test('an officer whose agency was dispatched is on the incident', () => {
+    const crew = evaluate(
+      request({
+        subject: subject(['INCIDENT_OFFICER'], { userId: 'usr-crew', agencyId: 'agy-ems' }),
+        action: 'INCIDENT_UPDATE',
+        purpose: 'EMERGENCY_RESPONSE',
+        resource: resource('INCIDENT', { classification: 'CONFIDENTIAL', subjectPcid: null }),
+        incidentContext: incidentContext({
+          assignedUserIds: ['usr-control'],
+          assignedAgencyIds: ['agy-ems'],
+        }),
+      }),
+    );
+    assert.equal(crew.effect, 'PERMIT');
+  });
+
+  test('an incident that is finished still admits being closed', () => {
+    // An incident is resolved before it is closed, and resolved is not an active
+    // status. Without this, every incident would stop one step short of closed.
+    const closing = evaluate(
+      request({
+        subject: subject(['INCIDENT_OFFICER'], { userId: 'usr-control', agencyId: 'agy-ems' }),
+        action: 'INCIDENT_CLOSE',
+        purpose: 'EMERGENCY_RESPONSE',
+        resource: resource('INCIDENT', { classification: 'CONFIDENTIAL', subjectPcid: null }),
+        incidentContext: incidentContext({
+          status: 'RESOLVED',
+          assignedUserIds: ['usr-control'],
+        }),
+      }),
+    );
+    assert.equal(closing.effect, 'PERMIT');
+
+    // And it is still bound: somebody outside cannot close it either.
+    const outsider = evaluate(
+      request({
+        subject: subject(['INCIDENT_OFFICER'], { userId: 'usr-outsider', agencyId: 'agy-fire' }),
+        action: 'INCIDENT_CLOSE',
+        purpose: 'EMERGENCY_RESPONSE',
+        resource: resource('INCIDENT', { classification: 'CONFIDENTIAL', subjectPcid: null }),
+        incidentContext: incidentContext({
+          status: 'RESOLVED',
+          assignedUserIds: ['usr-control'],
+          assignedAgencyIds: ['agy-ems'],
+        }),
+      }),
+    );
+    assert.equal(outsider.effect, 'DENY');
+    assert.equal(outsider.reasons[0]?.code, 'NOT_ASSIGNED_TO_INCIDENT');
+  });
+
+  test('a closed incident authorises nothing further, including its own record', () => {
+    const closed = evaluate(
+      request({
+        subject: subject(['INCIDENT_OFFICER'], { userId: 'usr-control', agencyId: 'agy-ems' }),
+        action: 'INCIDENT_UPDATE',
+        purpose: 'EMERGENCY_RESPONSE',
+        resource: resource('INCIDENT', { classification: 'CONFIDENTIAL', subjectPcid: null }),
+        incidentContext: incidentContext({
+          status: 'CLOSED',
+          assignedUserIds: ['usr-control'],
+        }),
+      }),
+    );
+    assert.equal(closed.effect, 'DENY');
+    assert.equal(closed.reasons[0]?.code, 'INCIDENT_NOT_ACTIVE');
+  });
+
+  test('sending your own unit is how an agency joins, so dispatch is not bound', () => {
+    // Binding DISPATCH_CREATE would make a multi-agency response impossible to
+    // start: the ambulance service could never answer a police-led incident.
+    const dispatch = evaluate(
+      request({
+        subject: subject(['DISPATCHER'], { userId: 'usr-ems', agencyId: 'agy-ems' }),
+        action: 'DISPATCH_CREATE',
+        purpose: 'EMERGENCY_RESPONSE',
+        resource: resource('DISPATCH', { classification: 'INTERNAL', subjectPcid: null }),
+        incidentContext: incidentContext({
+          assignedUserIds: ['usr-police'],
+          assignedAgencyIds: ['agy-police'],
+        }),
+      }),
+    );
+    assert.equal(dispatch.effect, 'PERMIT');
+  });
+
+  test('a listing addresses no incident, so the gate does not demand one', () => {
+    const listing = evaluate(
+      request({
+        subject: subject(['DISPATCHER'], { userId: 'usr-ems', agencyId: 'agy-ems' }),
+        action: 'INCIDENT_VIEW',
+        purpose: 'EMERGENCY_RESPONSE',
+        resource: {
+          ...resource('INCIDENT', { classification: 'CONFIDENTIAL', subjectPcid: null }),
+          id: null,
+        },
+      }),
+    );
+    assert.equal(listing.effect, 'PERMIT');
   });
 });
 
