@@ -19,6 +19,17 @@ export interface RequestOptions {
   /** Send without a session. Only sign-in and the second factor use this. */
   readonly anonymous?: boolean;
   readonly token?: string;
+  /**
+   * The registered device this request is being made from (§56).
+   *
+   * Supplied by the browser, which is the only place it can live: a device
+   * secret held in the portal's session would be per-session rather than
+   * per-device, and a device that cannot outlive a sign-in is not a device. It
+   * authenticates nothing on its own - the platform refuses it without a valid
+   * session belonging to the same account - so what the browser holds is a name,
+   * not a credential.
+   */
+  readonly deviceToken?: string;
 }
 
 export interface ApiClientConfig<T extends PortalSessionBase> {
@@ -50,6 +61,9 @@ export function createApiClient<T extends PortalSessionBase>(config: ApiClientCo
     };
     if (token !== null) requestHeaders.authorization = `Bearer ${token}`;
     if (options.body !== undefined) requestHeaders['content-type'] = 'application/json';
+    if (options.deviceToken !== undefined && options.deviceToken !== '') {
+      requestHeaders['x-device-token'] = options.deviceToken;
+    }
 
     // Forward the caller's address so the audit record and the platform's rate
     // limits see the person, not the portal.

@@ -10,7 +10,8 @@
     "./api": "./src/api.ts",
     "./format": "./src/format.ts",
     "./components": "./src/components/index.ts",
-    "./styles.css": "./src/styles/base.css"
+    "./styles.css": "./src/styles/base.css",
+    "./offline": "./src/offline/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit"

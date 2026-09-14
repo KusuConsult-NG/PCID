@@ -147,6 +147,29 @@ The seeder writes registry rows directly, which nothing else in this repository
 does. It refuses production, refuses a database holding rows it did not create,
 and marks everything it writes so `--remove` is exact.
 
+### Working on the offline mode
+
+Two things trip people up.
+
+**It needs a secure context.** Service workers and `crypto.subtle` are refused on
+plain HTTP, so the offline mode does not exist on `http://` — except on
+`localhost` and `127.0.0.1`, which browsers treat as secure. That is why the e2e
+suites can drive it at all, and why `docs/deployment.md` lists TLS on every
+portal as a checklist item rather than an assumption.
+
+**The worker caches the shell, and the rule is enforced by construction.** It
+only ever _puts_ a response in the cache when the request was for the offline
+page, an icon, or a `/_next/static/` asset — never by inspecting headers, which
+is the kind of check that quietly stops matching. If you add something the shell
+needs, add its path to `isShell` in `apps/*/public/sw.js`, and do not be tempted
+to widen it to "anything that looks static": a portal page holds exactly the
+information this platform spends its effort deciding who may see, and the
+browser's HTTP cache is neither encrypted, bounded in time, nor revocable.
+
+When the worker changes, bump `VERSION` in it. The activate handler deletes every
+cache that is not the current one, which is what stops a stale shell surviving a
+deploy.
+
 ### The TOTP wrinkle
 
 The platform refuses a TOTP time step at or below the last one used, which is

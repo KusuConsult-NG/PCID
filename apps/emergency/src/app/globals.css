@@ -347,3 +347,73 @@
   stroke: var(--surface-sunken);
   stroke-width: 4px;
 }
+
+/* The offline controls (§56). Deliberately plain: a crew reads these on a phone
+   in bad light, and the only thing that matters is whether the device is holding
+   something and until when. */
+.offline-control {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.offline-control p {
+  margin: 0 0 0.75rem;
+}
+
+.offline-control p.danger {
+  color: var(--danger-ink, #9a1c1c);
+}
+
+.offline-page {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.held-list {
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.held-person {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+.held-person h3 {
+  margin: 0 0 0.5rem;
+}
+
+.held-person dl {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0;
+}
+
+.held-person dl > div {
+  display: contents;
+}
+
+.held-person dt {
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.held-person dd {
+  margin: 0;
+}
+
+@media (max-width: 30rem) {
+  .held-person dl {
+    grid-template-columns: 1fr;
+  }
+  .held-person dt {
+    margin-top: 0.5rem;
+  }
+}

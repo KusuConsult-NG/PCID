@@ -50,6 +50,20 @@ address at all. Most of what follows exists because of it.
   response for every failed attempt — wrong password, unknown account and locked
   account are indistinguishable to the caller.
 
+### The general ceiling was documented before it existed
+
+`RATE_LIMIT_DEFAULT_MAX` was read from the configuration and described here and in
+`docs/api.md` as "a general per-account ceiling". Nothing consumed it. Building
+the offline mode is what surfaced it: the new routes hand out a pack of emergency
+profiles, and the only per-account bound on how often an account could ask for one
+would have been the ceiling that was not there.
+
+It is now applied in the authentication guard, which every authenticated request
+passes through, so it cannot be forgotten on a new controller. It is worth
+recording as a finding rather than a fix: a control that exists only in a document
+is worse than an absent one, because it is counted as present when somebody asks
+what bounds an account.
+
 ### Sign-in limits count failures, not sign-ins
 
 Sign-ins were once rate limited by network address as well as by account: fifty
@@ -381,6 +395,36 @@ prove the seven propositions of §75 at the engine and at the HTTP boundary.
 same for the portal in a real browser, against the standalone build the container
 runs.
 
+## A device may hold something, and only just
+
+The controlled offline mode (§56) is the one place this platform keeps data
+outside itself, and the threat it answers is narrow: a responder at a roadside
+with no signal who still has to know whether the casualty is diabetic.
+
+What makes it defensible is not the encryption on its own — it is that six things
+are true at once, and [mobile.md](mobile.md) names the place each is enforced.
+The two worth repeating here:
+
+**The bundle carries no authority.** It is data the platform already released to
+that person, never a token, never a key, never a way to ask for more. The device
+secret that goes with it authenticates nothing: presented without a signed-in
+session belonging to the same account, it is refused. So a stolen phone yields
+what its holder could already read for a few hours, and not a route into the
+register.
+
+**The encryption protects storage, not use.** The key is generated
+`extractable: false`, so an image of the device's storage, a phone backup or
+another application reading the profile directory get ciphertext. It does _not_
+protect against somebody using the phone while it is unlocked — nothing in a
+browser can — which is why the expiry is hours, the content is minimal, and
+signing the device out revokes its sessions and invalidates its releases in one
+act.
+
+The service worker is held to the same line: it caches the page furniture and
+never an authenticated response, because the browser's HTTP cache is neither
+encrypted, nor bounded in time, nor revocable. Both portal suites assert that no
+page about a person is in it after a full journey.
+
 ## Searching is bounded, and that is a control
 
 A search of the register that matches more than a thousand people is refused,
@@ -408,6 +452,11 @@ Stated plainly, because a security document that only lists strengths is not one
   five defects it found. What it could not establish is capacity on the hardware
   the state will buy: everything there shared four cores with the load generator.
   The rate limits are now measured rather than reasoned; the pool sizes are not.
+- **No device attestation.** A native application can ask the operating system to
+  vouch that it has not been tampered with; a web application cannot. The
+  platform compensates by never depending on the client being honest — a device
+  registration authenticates nothing and an offline bundle carries no authority —
+  but an attacker on a rooted phone with a live session is not detected as such.
 - **Signed audit exports** are not implemented; the chain is verifiable in place
   but there is no externally anchored proof.
 - **API client authentication** is modelled (`api_client`, scopes, IP ranges) but

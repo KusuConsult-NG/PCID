@@ -565,6 +565,7 @@ describe('§74 security tests', () => {
         ipAddress: null,
         userAgent: null,
         deviceFingerprint: null,
+        deviceToken: null,
         startedAt: Date.now(),
       },
     });

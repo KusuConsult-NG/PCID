@@ -45,6 +45,10 @@ export async function createTestContext(label: string): Promise<TestContext> {
   // above what the other tests perform.
   process.env.RATE_LIMIT_SEARCH_MAX = '8';
   process.env.RATE_LIMIT_WINDOW_SECONDS = '60';
+  // A suite makes far more requests per account in a minute than a person does.
+  // The general ceiling is raised here and exercised deliberately in
+  // `rate-limit.test.ts`, which sets it low in a process of its own.
+  process.env.RATE_LIMIT_DEFAULT_MAX = process.env.RATE_LIMIT_DEFAULT_MAX ?? '10000';
 
   const { migrate } = await import('../../src/database/migrator');
   const { findMigrationsDirectory } = await import('../../src/database/paths');

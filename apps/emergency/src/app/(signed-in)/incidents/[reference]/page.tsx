@@ -12,6 +12,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { PageHeader } from '@/components/chrome';
+import { KeepIncidentOffline } from '@/components/offline';
 import { callApi, dataOr } from '@/lib/api';
 import { can, readSession } from '@/lib/session';
 import type { IncidentFile, ResponseUnit } from '@/lib/types';
@@ -410,6 +411,18 @@ export default async function IncidentPage({
           attached by name — which is what control does for a crew from a service that has not been
           dispatched.
         </p>
+
+        {/*
+          Taking the casualties' profiles with you, for the stretch of road with
+          no coverage (§56). Offered only while the incident is live and only to
+          an account that holds the entitlement, because both are conditions the
+          platform will apply anyway and a button that is always refused is worse
+          than no button.
+        */}
+        <KeepIncidentOffline
+          reference={incident.incidentNumber}
+          canHold={live && can(session, 'OFFLINE_ACCESS')}
+        />
 
         {!live || !can(session, 'INCIDENT_UPDATE') ? null : (
           <>

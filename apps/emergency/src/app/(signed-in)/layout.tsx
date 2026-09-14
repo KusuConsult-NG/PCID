@@ -1,3 +1,4 @@
+import { ServiceWorkerRegistrar } from '@/components/offline';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
@@ -114,6 +115,13 @@ export default async function SignedInLayout({ children }: { children: React.Rea
       </main>
 
       <SiteFooter />
+      {/*
+        Registers the shell worker, which caches the stylesheet, the icons and
+        the "no signal" page and nothing else (§56). It is mounted from the
+        signed-in layout rather than the root so that a device only takes on a
+        worker once somebody has actually signed in on it.
+      */}
+      <ServiceWorkerRegistrar />
     </>
   );
 }

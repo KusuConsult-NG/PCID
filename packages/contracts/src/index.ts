@@ -6,6 +6,7 @@ export * from './authorization';
 export * from './cases';
 export * from './classification';
 export * from './credential';
+export * from './devices';
 export * from './emergency';
 export * from './errors';
 export * from './field-catalogue';

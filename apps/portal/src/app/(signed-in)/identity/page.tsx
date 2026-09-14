@@ -1,3 +1,4 @@
+import { KeepCardOffline } from '@/components/offline';
 import type { Metadata } from 'next';
 import QRCode from 'qrcode';
 
@@ -90,6 +91,13 @@ export default async function IdentityPage({
               </>
             )}
           </dl>
+
+          {/*
+            Keeping the identifier on the phone, for a queue with no coverage
+            (§56). Offered here, beside the card it copies, rather than buried in
+            settings - it is a property of this card, not of the account.
+          */}
+          <KeepCardOffline />
         </section>
 
         <section className="card" aria-labelledby="qr-heading">

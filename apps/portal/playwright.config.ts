@@ -44,7 +44,7 @@ export default defineConfig({
     {
       name: 'portal',
       dependencies: ['provision'],
-      testMatch: /(journeys|security)\.spec\.ts/,
+      testMatch: /(journeys|security|offline)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], storageState: RESIDENT_STATE_FILE },
     },
     {

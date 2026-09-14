@@ -17,22 +17,23 @@ npm run db:migrate    # idempotent
 npm run db:seed       # reference data; also idempotent
 ```
 
-| File                             | Contents                                                                                                              |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `0001_reference_data`            | Extensions, LGAs, wards, communities, reference sequences                                                             |
-| `0002_agencies_and_iam`          | Agency registry, roles, users, sessions, MFA, API clients                                                             |
-| `0003_audit`                     | The append-only hash-chained audit trail                                                                              |
-| `0004_citizen_registry`          | PCID allocation, citizens, emergency contacts, registration, duplicates, corrections                                  |
-| `0005_linked_records`            | Property, vehicle, business, licence, revenue projections; data sources, sync jobs, conflicts; the relationship graph |
-| `0006_public_safety`             | Incidents, dispatch, response units, cases, missing and unidentified persons, matches                                 |
-| `0007_authorization_workflows`   | Access requests, break-glass grants, alert rules, alerts, notifications                                               |
-| `0008_database_roles`            | `pcid_app` and `pcid_readonly` privileges                                                                             |
-| `0009_postgis_optional`          | PostGIS acceleration where available; a portable great-circle function otherwise                                      |
-| `0010_citizen_portal`            | Credentials, verification tokens, and the resident's self-service state                                               |
-| `0011_audit_chain_serialisation` | The locked chain head that makes the audit chain correct under concurrency                                            |
-| `0012_notification_delivery`     | Templates, backoff, suppression, deduplication, and the per-attempt delivery record                                   |
-| `0013_spatial_lookup`            | Position indexes the command map's bounding-box queries actually use                                                  |
-| `0014_registry_search_at_scale`  | Trigram ordering for name search, an email index for duplicate detection, and the chain head's own vacuum settings    |
+| File                                  | Contents                                                                                                              |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `0001_reference_data`                 | Extensions, LGAs, wards, communities, reference sequences                                                             |
+| `0002_agencies_and_iam`               | Agency registry, roles, users, sessions, MFA, API clients                                                             |
+| `0003_audit`                          | The append-only hash-chained audit trail                                                                              |
+| `0004_citizen_registry`               | PCID allocation, citizens, emergency contacts, registration, duplicates, corrections                                  |
+| `0005_linked_records`                 | Property, vehicle, business, licence, revenue projections; data sources, sync jobs, conflicts; the relationship graph |
+| `0006_public_safety`                  | Incidents, dispatch, response units, cases, missing and unidentified persons, matches                                 |
+| `0007_authorization_workflows`        | Access requests, break-glass grants, alert rules, alerts, notifications                                               |
+| `0008_database_roles`                 | `pcid_app` and `pcid_readonly` privileges                                                                             |
+| `0009_postgis_optional`               | PostGIS acceleration where available; a portable great-circle function otherwise                                      |
+| `0010_citizen_portal`                 | Credentials, verification tokens, and the resident's self-service state                                               |
+| `0011_audit_chain_serialisation`      | The locked chain head that makes the audit chain correct under concurrency                                            |
+| `0012_notification_delivery`          | Templates, backoff, suppression, deduplication, and the per-attempt delivery record                                   |
+| `0013_spatial_lookup`                 | Position indexes the command map's bounding-box queries actually use                                                  |
+| `0014_registry_search_at_scale`       | Trigram ordering for name search, an email index for duplicate detection, and the chain head's own vacuum settings    |
+| `0015_registered_devices_and_offline` | Devices allowed to hold something offline, and the record of every release that left                                  |
 
 ## Invariants held by the database
 
@@ -87,6 +88,31 @@ hundred thousand people, and the query took an arbitrary fifty of them, so a rea
 duplicate was usually not among them. The net is now the surname paired with the
 date of birth, which no candidate above the review threshold can escape - the
 arithmetic is asserted by a test - and it runs in 0.4ms.
+
+### What leaves on a device is bounded by the schema
+
+`offline_release` records every bundle that left the platform: which device,
+which incident or which person, how many records, and when it expires. Two
+constraints do the work that code must not be trusted alone to do:
+
+```sql
+CONSTRAINT offline_release_bounded CHECK (
+  expires_at > released_at AND expires_at <= released_at + interval '24 hours'
+)
+CHECK (record_count >= 0 AND record_count <= 50)
+```
+
+A test holds the contract's constants to those numbers, so raising one in code
+without the other fails the build.
+
+The table holds the _shape_ of a release and never its contents. Storing the
+payload would put the same personal data in a second place under a second
+retention rule, which is the thing the controlled offline mode exists to avoid.
+
+Revoking a device invalidates what it held in the same statement, through an
+`AFTER UPDATE` trigger that is `SECURITY DEFINER` — `pcid_app` may insert and
+select on `offline_release` and nothing else, so the record of what left is
+append-only to the application and only the trigger closes a row.
 
 ### A message is never sent twice, and never sent for ever
 

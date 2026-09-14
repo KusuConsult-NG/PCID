@@ -48,6 +48,11 @@ async function main(): Promise<void> {
     TOKEN_SIGNING_KEY,
     SECRET_ENCRYPTION_KEY,
     ALLOW_SANDBOX_ADAPTERS: 'true',
+    // A journey makes far more requests in a minute than a person does, so the
+    // general per-account ceiling is raised for the suite. It is exercised
+    // deliberately in `test/integration/rate-limit.test.ts`, at a level low
+    // enough to reach in a test rather than incidentally here.
+    RATE_LIMIT_DEFAULT_MAX: '10000',
     PLATFORM_BASE_URL: `http://127.0.0.1:${API_PORT}`,
     VERIFICATION_BASE_URL: `http://127.0.0.1:${API_PORT}/verify`,
   };

@@ -76,6 +76,19 @@ export default defineConfig({
       testMatch: /accessibility\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], storageState: STATE_FILES.DISPATCHER },
     },
+    {
+      // After everything, because its last test signs the crew's device out -
+      // which by design ends the sessions opened on it, including the one this
+      // suite shares. A project that did that in the middle would take the rest
+      // of the run down with it, which is the behaviour working correctly.
+      name: 'offline',
+      dependencies: ['accessibility'],
+      testMatch: /offline\.spec\.ts/,
+      use: {
+        ...devices['Pixel 7'],
+        storageState: STATE_FILES.EMERGENCY_RESPONDER,
+      },
+    },
   ],
   webServer: [
     {

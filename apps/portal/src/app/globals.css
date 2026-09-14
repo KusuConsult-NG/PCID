@@ -7,3 +7,45 @@
  * look like two governments.
  */
 @import '@pcid/portal-kit/styles.css';
+
+/* Keeping the identifier on the phone (§56). The offline card deliberately
+   echoes the credential above it, so the thing a resident shows an officer looks
+   the same whether or not there is a signal. */
+.offline-control {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.offline-control p {
+  margin: 0 0 0.75rem;
+}
+
+.offline-control p.danger {
+  color: var(--danger-ink, #9a1c1c);
+}
+
+.offline-page {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.offline-card {
+  border: 2px solid var(--brand);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  background: var(--brand-wash);
+}
+
+.offline-card-name {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.offline-card-pcid {
+  margin: 0.5rem 0 1rem;
+  font-size: 1.25rem;
+  letter-spacing: 0.08em;
+}

@@ -29,3 +29,21 @@ export async function endShift(): Promise<void> {
   await writeSession({ ...session, workingIncident: null, workingUnit: null });
   redirect('/account?cleared=1');
 }
+
+/**
+ * Sign a device out (§56).
+ *
+ * The platform ends the sessions opened on it and invalidates whatever it was
+ * holding; the device erases its copy when it next reaches the network. Until
+ * then what it holds is ciphertext that expires on its own, which is why bundles
+ * are short-lived and minimal rather than merely revocable.
+ */
+export async function signOutDevice(formData: FormData): Promise<void> {
+  const deviceId = String(formData.get('deviceId') ?? '');
+  const reason = String(formData.get('reason') ?? 'USER_REQUEST');
+  const result = await callApi(`/api/v1/me/devices/${encodeURIComponent(deviceId)}`, {
+    method: 'DELETE',
+    body: { reason },
+  });
+  redirect(result.ok ? '/account?device=signed-out#devices' : '/account?device=failed#devices');
+}

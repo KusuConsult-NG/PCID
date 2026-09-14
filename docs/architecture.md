@@ -455,15 +455,17 @@ nothing else worth optimising.
 
 The API and the four portals are the surface today. Still to build:
 
-- **Mobile applications** for citizens, field officers and responders, including
-  the controlled offline mode described in §56 — encrypted, expiring,
-  device-bound, minimal, revocable, and never a copy of the registry.
 - **An independent security assessment.** It cannot be self-certified, and it has
   not been done.
+
+The mobile applications are done: the citizen and responder portals install to a
+home screen and hold a bounded amount offline, and
+[mobile.md](mobile.md) sets out the stack decision, the six §56 properties and
+where each is enforced.
 
 Load testing against statewide volumes is done: [load-testing.md](load-testing.md)
 records what was measured, the five defects it found, and — set out at the end —
 what it does not establish, chief among which is capacity on production hardware.
 
-Until the remaining two are complete the platform is not ready for a pilot,
-whatever the test suite says.
+Until that is complete the platform is not ready for a pilot, whatever the test
+suite says.

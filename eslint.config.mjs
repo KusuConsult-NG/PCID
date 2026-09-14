@@ -41,6 +41,22 @@ export default tseslint.config(
     },
   },
   {
+    // The service workers. Plain JavaScript by necessity - they are served as
+    // they are written, not bundled - and they run in a worker global that has
+    // neither `window` nor Node's globals.
+    files: ['apps/*/public/sw.js'],
+    languageOptions: {
+      globals: {
+        self: 'readonly',
+        caches: 'readonly',
+        fetch: 'readonly',
+        Request: 'readonly',
+        Response: 'readonly',
+        URL: 'readonly',
+      },
+    },
+  },
+  {
     // Tests may reach into internals to prove a control holds.
     files: ['**/test/**/*.ts'],
     rules: { '@typescript-eslint/no-explicit-any': 'off', 'no-console': 'off' },

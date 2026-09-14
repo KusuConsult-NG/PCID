@@ -12,5 +12,6 @@ as a record.
 | [0003](0003-projections-not-ownership.md)   | The platform projects records, it never owns them     |
 | [0004](0004-token-carries-identity-only.md) | Access tokens carry identity, not entitlements        |
 | [0005](0005-portal-holds-the-session.md)    | The citizen portal holds the session, not the browser |
+| [0006](0006-installed-from-the-portal.md)   | The mobile applications are the portals, installed    |
 
 Add one when a future reader would otherwise ask "why on earth is it like this?".

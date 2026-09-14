@@ -1,10 +1,13 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 
 import { AppError } from '../common/errors';
 import { contextOf } from '../common/correlation';
+import { ENV } from '../config/config.module';
+import type { Env } from '../config/env';
 import { Database } from '../database/pool';
+import { RateLimiter } from '../security/rate-limit';
 import { TokenService } from '../security/token.service';
 import { IS_PUBLIC, REQUIRES_AAL2 } from './actor';
 import { ActorService } from './actor.service';
@@ -38,6 +41,8 @@ export class AuthGuard implements CanActivate {
     private readonly tokens: TokenService,
     private readonly actors: ActorService,
     private readonly db: Database,
+    private readonly limiter: RateLimiter,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -114,10 +119,46 @@ export class AuthGuard implements CanActivate {
       throw new AppError('STEP_UP_REQUIRED', 'Confirm your identity again to continue.');
     }
 
+    await this.enforceGeneralCeiling(actor.subject.userId);
+
     request.pcidActor = actor;
     // Correlate the operator log with the session without logging the token.
     contextOf(request);
     return true;
+  }
+
+  /**
+   * The general per-account ceiling (§45, §63).
+   *
+   * Documented since the first release and, until now, not enforced anywhere:
+   * `RATE_LIMIT_DEFAULT_MAX` was read from the configuration, described in
+   * `docs/api.md` as "a general per-account ceiling", and consumed by nothing. A
+   * control that exists only in a document is worse than an absent one, because
+   * it is counted as present.
+   *
+   * It sits here rather than in a separate guard so that it cannot be forgotten
+   * on a new controller: every authenticated route passes through this line.
+   * Public routes are already returned above - sign-in has its own, tighter
+   * limits, and applying a per-account ceiling to a request with no account
+   * would mean keying it on an address, which is the mistake the sign-in limiter
+   * was fixed for.
+   *
+   * It fails **open** on a counter-store outage, deliberately. The tighter
+   * limiters that guard credentials fail closed; this one does not, because a
+   * Redis incident must not take emergency response offline.
+   */
+  private async enforceGeneralCeiling(userId: string): Promise<void> {
+    const decision = await this.limiter.consume(
+      `requests:${userId}`,
+      this.env.RATE_LIMIT_DEFAULT_MAX,
+      this.env.RATE_LIMIT_WINDOW_SECONDS,
+    );
+    if (!decision.allowed) {
+      throw new AppError(
+        'RATE_LIMITED',
+        'Too many requests from this account. Wait a moment and try again.',
+      );
+    }
   }
 }
 

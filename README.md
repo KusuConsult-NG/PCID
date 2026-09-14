@@ -33,14 +33,15 @@ supplied one, and is never required to obtain a PCID.
 | Emergency response portal (`apps/emergency`)                  | Complete                                   |
 | Oversight: duplicate, correction and alert queues             | Complete                                   |
 | Load testing at statewide volume: harness, results, fixes     | Complete                                   |
-| Mobile applications                                           | Not started — see [Roadmap](#roadmap)      |
+| Mobile applications: installable portals, controlled offline  | Complete                                   |
 
 Five things run: the REST API, documented in OpenAPI at `/api/v1/docs` (and
 written to `docs/openapi.json` by `npm run openapi`), and four portals — for
 residents, for government counters, for security agencies, and for emergency
-control rooms and crews. Every portal is a client of that API like any other:
-none holds a database credential or a signing key, and each is authorised
-exactly as the person signed into it is.
+control rooms and crews. Two of those portals install to a phone's home screen
+and keep working, within strict limits, when there is no signal. Every portal is
+a client of that API like any other: none holds a database credential or a
+signing key, and each is authorised exactly as the person signed into it is.
 
 ## The idea in one paragraph
 
@@ -69,6 +70,7 @@ apps/security         The security agency portal: case files, case-bound access
                       to the register, missing and unidentified persons.
 apps/emergency        The emergency response portal: the board, dispatch, and
                       the minimum necessary profile under a live incident.
+                      Installable, and readable with no signal (§56).
 db/migrations         Version-controlled schema migrations.
 docs/                 Architecture, security, privacy, operations and guides.
 ```
@@ -197,6 +199,7 @@ build: `npx playwright install chromium`.
 | Every granted action has a route           | [`services/api/test/unit/action-coverage.test.ts`](services/api/test/unit/action-coverage.test.ts)           |
 | Duplicate detection cannot miss a match    | [`services/api/test/unit/duplicate-detection.test.ts`](services/api/test/unit/duplicate-detection.test.ts)   |
 | A search too broad to be an identification | [`services/api/test/integration/security.test.ts`](services/api/test/integration/security.test.ts)           |
+| What a device may keep, and for how long   | [`services/api/test/integration/offline.test.ts`](services/api/test/integration/offline.test.ts)             |
 
 ## What the platform deliberately cannot do
 
@@ -211,6 +214,12 @@ These are absences by design, and each is held by a test:
   own data and fetches nothing from anywhere: a tile provider receiving the
   rectangle a control room is looking at, several times a minute, would be
   receiving a description of where the state's emergencies are.
+- **No copy of the register on a device.** Two portals hold something offline and
+  the limits are narrow: a resident's own identifier, or the people already
+  attached to one live incident a responder is already on. Sealed under a key the
+  browser will not hand back, expiring in hours, erased when the device is signed
+  out, and never composed of anything its holder could not have read on screen.
+  The service worker caches the page furniture and no page about a person.
 - **No bulk export.** No role in the platform grants an export action, and no
   search returns more than a thousand people: a name against a register of four
   million matches a hundred thousand of them, and paging through that is browsing
@@ -240,6 +249,7 @@ These are absences by design, and each is held by a test:
 - [Deployment](docs/deployment.md) — running it in production
 - [Disaster recovery](docs/disaster-recovery.md) — RPO, RTO and the restore drill
 - [Load testing](docs/load-testing.md) — four million records, and what broke
+- [Mobile](docs/mobile.md) — the applications, and what a device may keep
 - [Incident response](docs/incident-response.md) — when something goes wrong
 - [MDA integration guide](docs/mda-integration.md) — connecting an agency system
 - [Administrator guide](docs/administrator-guide.md)
@@ -259,8 +269,11 @@ framework, asset registry integration, emergency response, security and case
 management, missing and unidentified persons, analytics, and notification
 delivery.
 
-Remaining before a pilot: the citizen, field officer and responder mobile
-applications, and an independent security assessment. Load testing is done —
+Remaining before a pilot: an independent security assessment, which cannot be
+self-certified. The mobile applications are done —
+[docs/mobile.md](docs/mobile.md) sets out what each one is, why they are
+installed from the portal rather than downloaded from a store, and exactly what a
+device is allowed to keep. Load testing is done —
 [docs/load-testing.md](docs/load-testing.md) records the method, the results, the
 five defects it found, and what it does not establish.
 [docs/architecture.md](docs/architecture.md#what-is-not-built-yet) sets out what

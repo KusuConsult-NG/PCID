@@ -1,3 +1,4 @@
+import { ServiceWorkerRegistrar } from '@/components/offline';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
@@ -86,6 +87,8 @@ export default async function SignedInLayout({ children }: { children: React.Rea
         </p>
       </div>
       <SiteFooter />
+      {/* Caches the shell and the "no connection" page, and nothing else (§56). */}
+      <ServiceWorkerRegistrar />
     </>
   );
 }

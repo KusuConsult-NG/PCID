@@ -49,6 +49,25 @@ const CITIZEN_THIRD_PARTY_REPORT_ACTIONS: ReadonlySet<Action> = new Set<Action>(
   'MISSING_PERSON_CREATE',
 ]);
 
+/**
+ * The only thing a citizen account may do under an emergency purpose.
+ *
+ * A resident may raise an emergency, which is why EMERGENCY_RESPONSE is a
+ * purpose their account may assert at all. Everything else an emergency purpose
+ * unlocks - a casualty's blood group, an incident's attached people, a pack of
+ * those to carry offline - belongs to the service attending it, and the gates
+ * that bind those to an incident all step aside for a citizen actor because a
+ * resident is never assigned to one. Without this, asserting the purpose would
+ * walk past them.
+ */
+const CITIZEN_EMERGENCY_ACTIONS: ReadonlySet<Action> = new Set<Action>(['INCIDENT_CREATE']);
+
+const EMERGENCY_PURPOSES: ReadonlySet<string> = new Set([
+  'EMERGENCY_RESPONSE',
+  'EMERGENCY_IDENTIFICATION',
+  'DISASTER_RESPONSE',
+]);
+
 /** Purposes a citizen acting on the citizen portal may ever assert. */
 const CITIZEN_PERMITTED_PURPOSES = new Set(['CITIZEN_SELF_SERVICE', 'EMERGENCY_RESPONSE']);
 
@@ -219,6 +238,14 @@ export function selfServiceScopeGate(request: PolicyRequest): GateResult {
       'SELF_SERVICE_SCOPE',
       'PURPOSE_NOT_AVAILABLE_TO_CITIZEN',
       'A citizen account may only act for self-service or to raise an emergency.',
+    );
+  }
+
+  if (EMERGENCY_PURPOSES.has(purpose) && !CITIZEN_EMERGENCY_ACTIONS.has(action)) {
+    return fail(
+      'SELF_SERVICE_SCOPE',
+      'EMERGENCY_PURPOSE_IS_FOR_REPORTING',
+      'A citizen account may assert an emergency purpose only to report an emergency.',
     );
   }
 

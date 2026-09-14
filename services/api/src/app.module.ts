@@ -30,6 +30,8 @@ import { CitizensService } from './identity/citizens.service';
 import { ConfigModule } from './config/config.module';
 import { CorrelationMiddleware } from './common/correlation';
 import { DatabaseModule } from './database/database.module';
+import { DevicesController } from './devices/devices.controller';
+import { DevicesService } from './devices/devices.service';
 import { DispatchService } from './emergency/dispatch.service';
 import { DuplicateDetectionService } from './identity/duplicate-detection';
 import { EmergencyController } from './emergency/emergency.controller';
@@ -49,6 +51,7 @@ import { NotificationsController } from './notifications/notifications.controlle
 import { NotificationsService } from './notifications/notifications.service';
 import { NotificationWorkerScheduler } from './notifications/worker.scheduler';
 import { MissingPersonsService } from './missing-persons/missing-persons.service';
+import { OfflineService } from './devices/offline.service';
 import { OversightController } from './oversight/oversight.controller';
 import { PcidService } from './identity/pcid.service';
 import { PolicyService } from './policy/policy.service';
@@ -80,6 +83,7 @@ import { SecurityModule } from './security/security.module';
     AnalyticsController,
     IntegrationController,
     NotificationsController,
+    DevicesController,
   ],
   providers: [
     ActorService,
@@ -114,6 +118,8 @@ import { SecurityModule } from './security/security.module';
     NotificationDeliveryWorker,
     NotificationOperationsService,
     NotificationWorkerScheduler,
+    DevicesService,
+    OfflineService,
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],

@@ -35,6 +35,20 @@ use, and the citizen portal from the public internet. That is a gateway decision
 application one — the platform authorises identically either way — but it is the
 cheapest additional control available and there is no reason not to take it.
 
+### The portals serve their own static assets
+
+Each portal's standalone build carries its `public/` directory, which now holds a
+service worker and the icons a device uses when the portal is installed to a home
+screen. Two consequences for whatever sits in front of them:
+
+- `/sw.js` must be served from the portal's own origin with a scope of `/`. A CDN
+  in front is fine; a CDN that rewrites the path is not, because a worker served
+  from `/assets/sw.js` cannot control `/`.
+- `/sw.js` should not be cached hard. The browser revalidates it, but a proxy
+  holding it for a week means a fixed worker does not reach the devices running
+  the broken one. `Cache-Control: no-cache` is the right answer for that one file;
+  the icons and `/_next/static/` are immutable and can be cached for a year.
+
 ## Configuration
 
 Every value is validated at boot, and the process refuses to start on a bad one.
@@ -287,7 +301,10 @@ Deliberately not a formality:
 - [ ] Every portal reaches the API over the internal network only
 - [ ] Only the citizen portal is reachable from the public internet
 - [ ] `*_ALLOWED_ORIGINS` list exactly each portal's public origins
-- [ ] Every portal served over TLS, so their session cookies are accepted as `Secure`
+- [ ] Every portal served over TLS — their session cookies are accepted as
+      `Secure`, and without it no device can be registered and no service worker
+      will install: the offline mode simply does not exist on plain HTTP, which
+      is the correct failure
 - [ ] A gateway is configured for every channel in use, and a test message arrived
 - [ ] At least one notification worker is running, and the queue depth is on a dashboard
 - [ ] `shared_buffers`, `work_mem` and `log_min_duration_statement` set as above

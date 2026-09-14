@@ -20,6 +20,10 @@ export const ACTIONS = [
   'CORRECTION_REQUEST_CREATE',
   'CORRECTION_REQUEST_REVIEW',
   'DUPLICATE_REVIEW',
+  // Holding a release on a device, after the read that produced it (§56). Held
+  // separately from the reads themselves because it is a different question: not
+  // "may this person see it" but "may it leave with them".
+  'OFFLINE_ACCESS',
 
   // Linked government records (source agency remains authoritative, §28)
   'VEHICLE_SEARCH',

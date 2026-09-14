@@ -159,6 +159,8 @@ export const ROLE_DEFINITIONS: readonly RoleDefinition[] = Object.freeze([
       'DISPATCH_UPDATE',
       'UNIDENTIFIED_PERSON_CREATE',
       'BREAK_GLASS_INITIATE',
+      // The one role that works where there is no signal (§56).
+      'OFFLINE_ACCESS',
     ],
   },
   {
@@ -277,6 +279,9 @@ export const ROLE_DEFINITIONS: readonly RoleDefinition[] = Object.freeze([
       'AUDIT_VIEW',
       'INCIDENT_CREATE',
       'MISSING_PERSON_CREATE',
+      // Their own identifier, on their own phone, where a queue at a counter has
+      // no coverage (§56).
+      'OFFLINE_ACCESS',
     ],
   },
 ]);

@@ -9,7 +9,21 @@ export interface RequestContext {
   correlationId: string;
   ipAddress: string | null;
   userAgent: string | null;
+  /**
+   * An opaque label the client supplies for its own device, recorded on the
+   * audit row so a person can recognise "the phone I use at the counter". It is
+   * not a secret and authorises nothing.
+   */
   deviceFingerprint: string | null;
+  /**
+   * The secret issued when a device was registered (§56). Held separately from
+   * the fingerprint because it *is* a secret: it is never written to the audit
+   * trail or the operator log, and it names a device allowed to hold something
+   * offline. It authenticates nothing on its own - it travels with an ordinary
+   * authenticated session and only says which registered device that session is
+   * being used from.
+   */
+  deviceToken: string | null;
   startedAt: number;
 }
 
@@ -38,6 +52,7 @@ export class CorrelationMiddleware implements NestMiddleware {
       ipAddress: extractIp(request),
       userAgent: request.header('user-agent') ?? null,
       deviceFingerprint: request.header('x-device-id') ?? null,
+      deviceToken: request.header('x-device-token') ?? null,
       startedAt: Date.now(),
     };
     response.setHeader(CORRELATION_HEADER, correlationId);
@@ -60,6 +75,7 @@ export function contextOf(request: Request): RequestContext {
       ipAddress: null,
       userAgent: null,
       deviceFingerprint: null,
+      deviceToken: null,
       startedAt: Date.now(),
     }
   );

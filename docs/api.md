@@ -157,6 +157,17 @@ separate limit on second-factor attempts. Sustained searching also raises a
 security alert for review — describing the account's activity, never the people
 searched for.
 
+The general ceiling is applied in the authentication guard, so it cannot be
+forgotten on a new controller, and it is keyed on the account rather than on an
+address: a ceiling keyed on an address turns one busy officer into an outage for
+the whole office behind their gateway. It fails **open** if the counter store is
+unreachable, deliberately — the limiters that guard credentials fail closed, this
+one does not, because a Redis incident must not take emergency response offline.
+
+Sign-in is not governed by it. An unauthenticated request has no account to key
+on, and the sign-in path has its own limits: per identifier, and per address on
+_failed_ attempts only.
+
 ## Endpoint groups
 
 | Group                    | Path                                                        | Purpose                                             |
@@ -177,6 +188,32 @@ searched for.
 | Administration           | `/agencies/*`, `/users/*`                                   | Registry, user administration, your own account     |
 | Integrations             | `/integrations/*`                                           | Data sources and synchronisation                    |
 | Operations               | `/health/*`                                                 | Liveness and readiness                              |
+
+## A device may keep almost nothing
+
+`POST /me/devices` registers the device a request came from and returns a secret,
+once. Present it as `x-device-token` on the two routes that release something for
+a device to keep: `GET /me/offline-card` (a resident's own identifier and name)
+and `GET /incidents/{reference}/offline-bundle` (the people already attached to a
+live incident the caller is attached to).
+
+The secret **authenticates nothing**. It travels with an ordinary authenticated
+session and says only which registered device that session is being used from, so
+that what the device holds can be bounded and taken back. A request carrying it
+without a session is unauthenticated like any other.
+
+Every person in a bundle is produced by the ordinary emergency-profile path, one
+at a time, each authorised and each audited — so a bundle cannot contain anything
+its holder could not have read on screen, and a resident's own access history
+shows both the read and the fact that it left on a device.
+
+`DELETE /me/devices/{deviceId}` ends a device: its sessions are revoked, its
+releases are marked invalid, and it is refused anything further.
+`GET /me/offline-releases/{releaseId}` is what a client asks on reconnecting —
+an unknown release, an expired one and a revoked device all answer the same way,
+because a client that cannot tell them apart still behaves correctly.
+
+See [mobile.md](mobile.md) for the limits and why they are those.
 
 ## The citizen credential is a code, not a record
 

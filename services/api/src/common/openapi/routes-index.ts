@@ -11,6 +11,7 @@ import '../../analytics/analytics.controller';
 import '../../assets/assets.controller';
 import '../../audit/audit.controller';
 import '../../cases/cases.controller';
+import '../../devices/devices.controller';
 import '../../emergency/emergency.controller';
 import '../../health/health.controller';
 import '../../iam/admin.controller';

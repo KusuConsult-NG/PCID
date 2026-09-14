@@ -87,6 +87,18 @@ withholding is governed:
 - the default is derived from the purpose, so a module that simply forgets cannot
   quietly expose an investigation _or_ quietly hide an ordinary access.
 
+### What left on a device is in that history too
+
+When a responder takes an incident's people onto a device, each person gets two
+entries in their own access history: that their emergency profile was read, and
+that it was carried away on a device and until when (§56).
+
+The second is not decoration. A history that said only "your profile was read
+during incident INC-2026-000123" would be answering a narrower question than the
+one a resident is asking — which is where their information went, and whether it
+is still somewhere. The entry names the incident, the service, and the hour the
+copy stopped being authorised.
+
 ## Special categories
 
 **Health data.** Blood group and disclosed critical conditions are classified

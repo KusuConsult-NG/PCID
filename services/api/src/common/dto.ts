@@ -3,6 +3,8 @@ import {
   CASE_SUBJECT_ROLES,
   CASE_TYPES,
   CLASSIFICATIONS,
+  DEVICE_PLATFORMS,
+  DEVICE_REVOCATION_REASONS,
   DISPATCH_STATUSES,
   INCIDENT_SEVERITIES,
   INCIDENT_STATUSES,
@@ -551,6 +553,28 @@ export const agencyStatusSchema = z.object({
 });
 
 export const verifySchema = z.object({ pcid: pcidSchema });
+
+/* --- Registered devices and the offline mode (§56) ------------------------ */
+
+export const deviceRegistrationSchema = z.object({
+  /**
+   * What the owner will recognise in a list of their own devices. A person
+   * revoking a lost phone at three in the morning should not have to work out
+   * which of four identifiers is theirs.
+   */
+  label: z.string().min(1).max(64),
+  platform: z.enum(DEVICE_PLATFORMS as unknown as [string, ...string[]]),
+});
+
+export const deviceRevocationSchema = z.object({
+  // Defaulted, because the ordinary case is a person signing out a device they
+  // still have, and a form that demands a reason for that is a form that gets
+  // skipped. "Lost or stolen" is the one worth asking for, and it is the one an
+  // interface offers as a separate button.
+  reason: z
+    .enum(DEVICE_REVOCATION_REASONS as unknown as [string, ...string[]])
+    .default('USER_REQUEST'),
+});
 
 /* --- Citizen portal (§17, §39, §40, §58) ---------------------------------- */
 

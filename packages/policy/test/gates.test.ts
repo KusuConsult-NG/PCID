@@ -3,6 +3,7 @@ import { test, describe } from 'node:test';
 
 import { ACTION_PURPOSES, ACTION_RESOURCE_TYPES } from '../src/action-metadata';
 import { evaluate, projectFields, restrictedFieldPaths } from '../src/engine';
+import { selfServiceScopeGate } from '../src/gates';
 import {
   NOW,
   approval,
@@ -580,5 +581,62 @@ describe('action metadata completeness', () => {
     );
     assert.equal(decision.effect, 'DENY');
     assert.equal(decision.reasons[0]?.gate, 'PURPOSE');
+  });
+});
+
+/** A resident acting on the citizen portal, with a record of their own. */
+function citizenRequest(input: {
+  action: Parameters<typeof request>[0]['action'];
+  purpose: Parameters<typeof request>[0]['purpose'];
+}) {
+  return request({
+    subject: subject(['CITIZEN'], {
+      userId: 'usr-citizen',
+      actorType: 'CITIZEN',
+      agencyId: null,
+      agencyCategory: null,
+      agencyStatus: null,
+      dataSharingAgreement: null,
+      agencyMaxClassification: 'HIGHLY_RESTRICTED',
+      compartments: [],
+      clearance: 'HIGHLY_RESTRICTED',
+      subjectPcid: 'PL-AAAAA-BBBBB-CC',
+    }),
+    action: input.action,
+    purpose: input.purpose,
+    resource: resource('CITIZEN', { subjectPcid: 'PL-AAAAA-BBBBB-CC' }),
+  });
+}
+
+describe('a citizen account under an emergency purpose (§17, §56)', () => {
+  test('may report an emergency and nothing else', () => {
+    // EMERGENCY_RESPONSE is a purpose a resident may assert, because raising an
+    // emergency is a thing they do. Everything else it unlocks belongs to the
+    // service attending one - and the gates that bind those to an incident all
+    // step aside for a citizen actor, because a resident is never assigned to
+    // one. Without this rule, asserting the purpose would walk straight past
+    // them.
+    const reporting = selfServiceScopeGate(
+      citizenRequest({ action: 'INCIDENT_CREATE', purpose: 'EMERGENCY_RESPONSE' }),
+    );
+    assert.equal(reporting, null, 'reporting an emergency is what the purpose is for');
+
+    for (const action of ['OFFLINE_ACCESS', 'EMERGENCY_PROFILE_VIEW', 'CITIZEN_VIEW'] as const) {
+      const refused = selfServiceScopeGate(
+        citizenRequest({ action, purpose: 'EMERGENCY_RESPONSE' }),
+      );
+      assert.equal(
+        refused?.reason.code,
+        'EMERGENCY_PURPOSE_IS_FOR_REPORTING',
+        `${action} must be refused`,
+      );
+    }
+  });
+
+  test('may still hold its own identifier, which is self-service', () => {
+    const own = selfServiceScopeGate(
+      citizenRequest({ action: 'OFFLINE_ACCESS', purpose: 'CITIZEN_SELF_SERVICE' }),
+    );
+    assert.equal(own, null);
   });
 });

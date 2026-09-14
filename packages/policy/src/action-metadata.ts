@@ -54,6 +54,10 @@ export const ACTION_PURPOSES: Readonly<Record<Action, readonly Purpose[]>> = Obj
   CORRECTION_REQUEST_CREATE: [...SELF, 'CORRECTION_REVIEW', 'SERVICE_DELIVERY'],
   CORRECTION_REQUEST_REVIEW: ['CORRECTION_REVIEW'],
   DUPLICATE_REVIEW: ['IDENTITY_INTEGRITY_REVIEW'],
+  // A resident holding their own identifier, and a responder holding the
+  // profiles of people on an incident they are attached to. Nothing else has a
+  // case for leaving the platform (§56).
+  OFFLINE_ACCESS: [...SELF, ...EMERGENCY],
 
   VEHICLE_SEARCH: [...INVESTIGATION, ...EMERGENCY, 'REVENUE_ADMINISTRATION'],
   VEHICLE_VIEW: [
@@ -195,6 +199,11 @@ export const INCIDENT_RECORD_ACTIONS: ReadonlySet<Action> = new Set<Action>([
   'INCIDENT_VIEW',
   'INCIDENT_UPDATE',
   'INCIDENT_CLOSE',
+  // Taking an incident's profiles offline is bound to that incident like any
+  // other act on it, and deliberately *not* exempt from the active-status check
+  // the way INCIDENT_VIEW is: a crew may read back a job that is over, and may
+  // not carry its casualties' medical details away from one.
+  'OFFLINE_ACCESS',
 ]);
 
 /**
@@ -327,6 +336,7 @@ export const ACTION_RESOURCE_TYPES: Readonly<Record<Action, readonly ResourceTyp
     CORRECTION_REQUEST_CREATE: ['CORRECTION_REQUEST', 'CITIZEN'],
     CORRECTION_REQUEST_REVIEW: ['CORRECTION_REQUEST'],
     DUPLICATE_REVIEW: ['CITIZEN'],
+    OFFLINE_ACCESS: ['CITIZEN', 'INCIDENT'],
 
     VEHICLE_SEARCH: ['VEHICLE'],
     VEHICLE_VIEW: ['VEHICLE'],

@@ -9,9 +9,19 @@ import { readSession } from '@/lib/session';
 import type { Me } from '@/lib/types';
 import { actionLabel } from '@/lib/vocabulary';
 
-import { endSession, endShift } from './actions';
+import { endSession, endShift, signOutDevice } from './actions';
 
 export const metadata: Metadata = { title: 'My account' };
+
+interface RegisteredDevice {
+  readonly id: string;
+  readonly label: string;
+  readonly platform: string;
+  readonly registeredAt: string;
+  readonly lastSeenAt: string;
+  readonly revokedAt: string | null;
+  readonly current: boolean;
+}
 
 interface OpenSession {
   readonly id: string;
@@ -37,12 +47,14 @@ export default async function AccountPage({
   const params = await searchParams;
   const session = await readSession();
 
-  const [me, openSessions] = await Promise.all([
+  const [me, openSessions, registered] = await Promise.all([
     callApi<Me>('/api/v1/auth/me'),
     callApi<OpenSession[]>('/api/v1/users/me/sessions'),
+    callApi<{ devices: RegisteredDevice[] }>('/api/v1/me/devices'),
   ]);
   const account = dataOr(me, null);
   const open = dataOr(openSessions, []);
+  const devices = dataOr(registered, { devices: [] }).devices;
 
   return (
     <>
@@ -236,6 +248,91 @@ export default async function AccountPage({
                           <input type="hidden" name="sessionId" value={entry.id} />
                           <SubmitButton className="button button-quiet" pendingLabel="Ending…">
                             End this session
+                          </SubmitButton>
+                        </form>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="card" id="devices" aria-labelledby="devices-heading">
+        <div className="card-header">
+          <h2 id="devices-heading">Devices that can hold something offline</h2>
+        </div>
+        <p>
+          A device registered here may keep the people on an incident you are attending, so you can
+          read them where there is no signal. It holds nothing else, it is sealed so that a copy of
+          the device’s storage is unreadable, and it erases itself after four hours.
+        </p>
+        <p>
+          <strong>If one of these is lost, sign it out.</strong> That ends the sessions opened on
+          it, stops it being given anything more, and marks what it holds as no longer yours to hold
+          — which the device acts on the moment it reaches a network again.
+        </p>
+
+        {params.device === 'signed-out' ? (
+          <Notice tone="ok" title="That device is signed out" live>
+            It will erase what it holds when it next reaches the network, and it expires on its own
+            either way.
+          </Notice>
+        ) : null}
+        {params.device === 'failed' ? (
+          <Notice tone="danger" title="That device could not be signed out" live>
+            It may already have been. Refresh the page to see the current list.
+          </Notice>
+        ) : null}
+
+        {devices.length === 0 ? (
+          <Empty>
+            No device is registered. One is registered the first time you keep an incident for
+            offline reading.
+          </Empty>
+        ) : (
+          <div className="table-scroll">
+            <table>
+              <caption className="visually-hidden">Devices registered to your account</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Device</th>
+                  <th scope="col">Registered</th>
+                  <th scope="col">Last used</th>
+                  <th scope="col">
+                    <span className="visually-hidden">Action</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {devices.map((device) => (
+                  <tr key={device.id}>
+                    <td>
+                      {device.label} <Badge tone="muted">{sentenceCase(device.platform)}</Badge>
+                      {device.current ? (
+                        <>
+                          {' '}
+                          <Badge tone="ok">This device</Badge>
+                        </>
+                      ) : null}
+                      {device.revokedAt === null ? null : (
+                        <>
+                          {' '}
+                          <Badge tone="danger">Signed out</Badge>
+                        </>
+                      )}
+                    </td>
+                    <td>{formatDateTime(device.registeredAt)}</td>
+                    <td>{formatDateTime(device.lastSeenAt)}</td>
+                    <td>
+                      {device.revokedAt !== null ? null : (
+                        <form action={signOutDevice}>
+                          <input type="hidden" name="deviceId" value={device.id} />
+                          <input type="hidden" name="reason" value="LOST_OR_STOLEN" />
+                          <SubmitButton className="button button-quiet" pendingLabel="Signing out…">
+                            Sign this device out
                           </SubmitButton>
                         </form>
                       )}
