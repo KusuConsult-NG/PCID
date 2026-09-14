@@ -425,12 +425,28 @@ export function incidentBindingGate(request: PolicyRequest): GateResult {
       'INCIDENT_BINDING',
     );
   }
-  // Closing is the one act a finished incident still admits. An incident is
-  // resolved before it is closed, and resolved is not an active status, so a
-  // rule without this exception would leave every incident stuck one step short
-  // of closed with nothing able to finish it. Moving it back to a live status is
-  // INCIDENT_UPDATE and stays refused, so this does not reopen anything.
-  if (action !== 'INCIDENT_CLOSE' && !ACTIVE_INCIDENT_STATUSES.includes(incidentContext.status)) {
+  // Two acts a finished incident still admits, and only these two.
+  //
+  // Closing, because an incident is resolved before it is closed and resolved is
+  // not an active status: a rule without this would leave every incident stuck
+  // one step short of closed with nothing able to finish it.
+  //
+  // And reading the incident record, because that record is operational rather
+  // than personal - what happened, which units went, how long each step took -
+  // and a service that cannot read back a job it attended cannot debrief it,
+  // answer a complaint about it, or check the response times it is measured on.
+  // This is where an incident differs from a case: a case file lists its
+  // subjects by identifier with the reason each was linked, so closing a case
+  // closes the file; an incident record names no citizen at all, and the
+  // emergency profiles it authorised are a separate read that stays refused.
+  //
+  // Everything else - updating, attaching, dispatching - is refused, so nothing
+  // reopens and nobody is added to a job that is over.
+  if (
+    action !== 'INCIDENT_CLOSE' &&
+    action !== 'INCIDENT_VIEW' &&
+    !ACTIVE_INCIDENT_STATUSES.includes(incidentContext.status)
+  ) {
     return fail(
       'INCIDENT_BINDING',
       'INCIDENT_NOT_ACTIVE',

@@ -14,7 +14,8 @@
     "services/api",
     "apps/portal",
     "apps/government",
-    "apps/security"
+    "apps/security",
+    "apps/emergency"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
@@ -35,7 +36,8 @@
     "dev:portal": "npm run dev --workspace @pcid/portal",
     "dev:government": "npm run dev --workspace @pcid/government-portal",
     "dev:security": "npm run dev --workspace @pcid/security-portal",
-    "test:e2e": "npm run test:e2e --workspace @pcid/portal && npm run test:e2e --workspace @pcid/government-portal && npm run test:e2e --workspace @pcid/security-portal"
+    "dev:emergency": "npm run dev --workspace @pcid/emergency-portal",
+    "test:e2e": "npm run test:e2e --workspace @pcid/portal && npm run test:e2e --workspace @pcid/government-portal && npm run test:e2e --workspace @pcid/security-portal && npm run test:e2e --workspace @pcid/emergency-portal"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

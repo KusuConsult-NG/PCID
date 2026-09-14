@@ -88,6 +88,7 @@ jobs:
           - { name: Citizen, workspace: '@pcid/portal' }
           - { name: Government, workspace: '@pcid/government-portal' }
           - { name: Security, workspace: '@pcid/security-portal' }
+          - { name: Emergency, workspace: '@pcid/emergency-portal' }
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -168,4 +169,10 @@ jobs:
         with:
           context: .
           file: apps/security/Dockerfile
+          push: false
+      - name: Build the emergency response portal image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/emergency/Dockerfile
           push: false

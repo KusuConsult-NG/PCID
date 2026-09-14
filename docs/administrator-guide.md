@@ -144,19 +144,42 @@ than showing them an empty space.
 ### Which portal an account signs into
 
 A role decides what an account can do; it does not decide which application the
-person opens. There are three, and an account signs into whichever one matches
-its work:
+person opens. There are four, and an account signs into whichever one matches its
+work:
 
 | Portal            | Port | For                                              |
 | ----------------- | ---- | ------------------------------------------------ |
 | `apps/portal`     | 3100 | Residents, their own record only                 |
 | `apps/government` | 3200 | Registration desks, service counters, oversight  |
 | `apps/security`   | 3300 | Investigators, supervisors, missing-person desks |
+| `apps/emergency`  | 3400 | Control rooms, crews, and the fleet office       |
 
 Each seals its session with a key of its own and has its own idle timeout — the
-security portal's is the shortest at ten minutes. An officer holding roles that
-span two of them signs into each separately; there is no shared session, by
-design.
+security portal's is the shortest at ten minutes, the emergency portal's the
+longest at twelve hours, for reasons set out in
+[Security](security.md#the-portals). An officer holding roles that span two of
+them signs into each separately; there is no shared session, by design.
+
+### Clearance has to match the work
+
+A role grants an action; the clearance ceiling decides whether the account can
+ever exercise it. The two are set separately, so they can disagree — and a
+mismatch looks to the officer like a platform fault rather than a configuration
+one.
+
+The case that bites in practice is the field responder. `EMERGENCY_RESPONDER`
+grants `UNIDENTIFIED_PERSON_CREATE` and `EMERGENCY_PROFILE_VIEW`, but an
+unidentified-person record is `SENSITIVE`, and the blood group and the conditions
+a resident chose to disclose for exactly this moment are `HIGHLY_RESTRICTED`. A
+responder below that ceiling holds every action the job needs and can exercise
+none of them: the profile comes back with "Restricted information" where the
+clinical detail should be, which is §29 working and a crew unable to do their
+work. Provision responders at `HIGHLY_RESTRICTED`.
+
+A fleet office is the opposite case and is correct as it stands:
+`SECURITY_ADMINISTRATOR` is a technical role, `RESPONSE_UNIT_MANAGE` acts on
+vehicles, and `INTERNAL` is the right ceiling. It can put an ambulance on the
+road and cannot read one field about the person in it.
 
 ### Jurisdiction and access windows
 

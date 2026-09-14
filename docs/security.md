@@ -176,9 +176,42 @@ holds no privilege on the head table at all, so no application path can choose
 its own predecessor. `security.test.ts` fires twenty-four concurrent authorised
 reads and asserts the chain is still intact.
 
+## The gate that stopped at the data
+
+The incident-binding gate applied only to citizen-data actions. Reading,
+changing and closing one named incident were therefore bound by nothing but
+role, purpose and jurisdiction — so any account holding `INCIDENT_UPDATE` could
+attach itself to any live incident in the state, and attaching is exactly the act
+that opens the casualties' emergency profiles. Closing somebody else's incident
+was open in the same way.
+
+This was found while building the route the emergency guide has always called
+"the normal path": control attaching a responder who is not on the incident.
+Writing the route made the hole visible, because the route was the shortest way
+to walk through it.
+
+`INCIDENT_RECORD_ACTIONS` now mirrors `CASE_RECORD_ACTIONS`: `INCIDENT_VIEW`,
+`INCIDENT_UPDATE` and `INCIDENT_CLOSE` are bound to the incident whenever one is
+addressed, by account or by agency. A listing addresses none and is unaffected.
+
+Two exceptions are deliberate and each has a test:
+
+- **`DISPATCH_CREATE` is not bound.** Sending your own unit is how an agency
+  joins an incident it did not open; binding it would mean the ambulance service
+  could never answer a police-led incident. It attaches only the agency whose
+  unit was actually sent.
+- **A finished incident still admits closing and reading.** An incident is
+  resolved before it is closed and resolved is not an active status, so a rule
+  without the first exception would leave every incident stuck one step short of
+  closed. The second is where an incident differs from a case: an incident record
+  names no citizen, and a service that cannot read back a job it attended cannot
+  debrief it or answer a complaint. The emergency profiles the incident
+  authorised are a separate read and stay refused — that is the access closing
+  was meant to end.
+
 ## The portals
 
-Each portal is a separate trust boundary and is treated as one. All three are
+Each portal is a separate trust boundary and is treated as one. All four are
 clients of the API with no database credential, no token-signing key and no
 entitlement of their own; each is authorised exactly as the person signed into
 it is, through the same policy engine as any other caller. They seal their
@@ -188,9 +221,14 @@ cookie for another.
 Their idle timeouts differ, and the differences are deliberate: thirty minutes
 for a resident on their own phone, fifteen for an officer at a shared counter,
 ten for the security agency portal, whose reach is case-bound access to the
-register on a machine in a command room somebody else can walk into.
+register on a machine in a command room somebody else can walk into — and twelve
+hours for the emergency portal, which is the opposite of what a risk table alone
+would say. A crew locked out mid-job writes the passphrase on the dashboard, and
+then the control is worse than none. What holds the risk down there is the
+reach: the Minimum Necessary Emergency Profile, under a live incident the
+account is attached to, ending when the incident does.
 
-The controls below hold for all three.
+The controls below hold for all four.
 
 - **No token in the browser.** The portal renders on the server and holds the
   resident's access and refresh tokens itself. The browser gets a cookie
@@ -210,10 +248,10 @@ The controls below hold for all three.
   also knew.
 - **Step-up is handled, not worked around.** An operation that changes the
   register or somebody's access to it requires a session re-proved minutes ago,
-  not one proved this morning and left open on a counter. The government and
-  security portals send the officer to re-authenticate and return them to the
-  task, and the return address is refused unless it is a path within the
-  application.
+  not one proved this morning and left open on a counter. The government,
+  security and emergency portals send the officer to re-authenticate and return
+  them to the task, and the return address is refused unless it is a path within
+  the application.
 - **Sign-in reveals nothing.** A wrong passphrase and an identifier that was
   never issued produce the same message, so the page cannot be used to find out
   which Plateau Citizen IDs exist.
@@ -243,6 +281,12 @@ the same as being on the case. It asserts that a record cannot be opened without
 one; that a person not linked to the case is refused in the same words as a
 person who does not exist; that an investigator cannot close their own case; and
 that a closed case authorises nothing further, including its own file.
+
+`apps/emergency/e2e/` runs the same idea for the incident: control, a crew, and
+a fleet office. The fleet office is the one worth having — "a technical role
+carries no entitlement to citizen data" (§7) is a claim the platform makes about
+itself, and that project walks the account that can put an ambulance on the road
+at every page that would show it a person, and requires it to find nothing.
 
 ## Verified by tests
 

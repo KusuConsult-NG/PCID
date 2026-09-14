@@ -1,0 +1,241 @@
+/*
+ * The emergency response portal's stylesheet.
+ *
+ * The design system is the shared one: four applications, one government. What
+ * is here is what must differ.
+ *
+ * The masthead is a deep orange - green for residents, blue for government
+ * counters, maroon for security agencies, orange here. That is not decoration.
+ * A control room has all four open on a wall.
+ *
+ * The rest of this file is about one thing: a page read at arm's length, in a
+ * vehicle, at night, by somebody wearing gloves. Targets are bigger, the board
+ * is legible across a room, and severity is never carried by colour alone.
+ */
+@import '@pcid/portal-kit/styles.css';
+
+:root {
+  --emg: #9a3b12;
+  --emg-strong: #6a280c;
+  --emg-wash: #fdf0e8;
+}
+
+:root:not([data-theme='light']) {
+  @media (prefers-color-scheme: dark) {
+    --emg: #6a280c;
+    --emg-wash: #2a1a12;
+  }
+}
+
+.masthead-emergency {
+  background: var(--emg);
+  border-bottom-color: var(--emg-strong);
+}
+
+/* The incident an account is working, shown wherever a person is read. */
+.incident-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--emg);
+  border-radius: var(--radius);
+  background: var(--emg-wash);
+  margin-bottom: 1.25rem;
+}
+
+.incident-banner strong {
+  font-weight: 700;
+}
+
+/*
+ * The board. One row per incident, readable from across a control room, with
+ * the severity said in words as well as shown in colour.
+ */
+.board {
+  display: grid;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.board > li {
+  display: grid;
+  gap: 0.35rem 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+}
+
+.board > li.critical {
+  border-left-color: var(--danger);
+  background: var(--danger-wash);
+}
+
+.board > li.high {
+  border-left-color: var(--warning);
+}
+
+.board .headline {
+  font-size: var(--step-1);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.board .where {
+  grid-column: 1 / -1;
+  color: var(--ink-muted);
+}
+
+/* The count tiles on the board page. */
+.tiles {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  margin-bottom: 1.5rem;
+}
+
+.tile {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.tile .count {
+  display: block;
+  font-size: var(--step-4);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+/* A unit in the fleet or on the nearest-available list. */
+.unit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+}
+
+.unit .code {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+  font-size: var(--step-1);
+  font-weight: 700;
+}
+
+/* The measured response times, which nobody types in by hand. */
+.times {
+  display: grid;
+  gap: 0.5rem 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+
+.times div {
+  border-top: 2px solid var(--line-strong);
+  padding-top: 0.4rem;
+}
+
+.times dt {
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
+
+.times dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--step-1);
+  font-weight: 600;
+}
+
+/* The incident's running record. */
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.timeline li {
+  border-left: 3px solid var(--line-strong);
+  padding: 0.1rem 0 0.1rem 0.9rem;
+}
+
+.timeline .muted {
+  display: block;
+}
+
+/*
+ * A closed list of things to tick, with the whole row as the target rather than
+ * the small square. Gloves.
+ */
+.choices {
+  border: 0;
+  padding: 0;
+  margin: 0 0 1.25rem;
+}
+
+.choices > legend {
+  padding: 0;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.choice {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.55rem 0.6rem;
+  border-radius: 4px;
+  font-weight: 400;
+}
+
+.choice:hover {
+  background: var(--emg-wash);
+}
+
+.choice input[type='checkbox'] {
+  width: 1.4rem;
+  height: 1.4rem;
+  margin-top: 0.1rem;
+  flex: none;
+}
+
+.choice .hint {
+  font-weight: 400;
+}
+
+.entitlements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+/*
+ * Buttons a crew presses. Bigger than the rest of the design system's, because
+ * the alternative is a mis-tap on a moving vehicle's screen.
+ */
+.step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.step-actions .button {
+  min-height: 3rem;
+  padding-inline: 1.25rem;
+  font-size: var(--step-1);
+}

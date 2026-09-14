@@ -28,10 +28,12 @@ export PCID_API_URL=http://127.0.0.1:3000
 export PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
 export GOVERNMENT_PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
 export SECURITY_PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+export EMERGENCY_PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
 
 npm run dev:portal       # http://localhost:3100
 npm run dev:government   # http://localhost:3200
 npm run dev:security     # http://localhost:3300
+npm run dev:emergency    # http://localhost:3400
 ```
 
 The seed and the API must share `SECRET_ENCRYPTION_KEY`: authenticator secrets
@@ -50,6 +52,7 @@ apps/portal          The citizen portal. Depends on portal-kit and on the API
                      over HTTP; on nothing else in this repository.
 apps/government      The government portal. The same.
 apps/security        The security agency portal. The same.
+apps/emergency       The emergency response portal. The same.
 ```
 
 The rule is one-directional and worth protecting: `@pcid/policy` must never import
@@ -79,24 +82,28 @@ and can be run repeatedly.
 
 ### The end-to-end suite
 
-`npm run test:e2e` runs all three suites and needs nothing running. Each builds
+`npm run test:e2e` runs all four suites and needs nothing running. Each builds
 the API, recreates a database of its own, starts the service and the portal's
 standalone build on ports of its own (3400/3401 for the citizen portal,
-3402/3403 for the government one, 3404/3405 for the security agency one), seeds
-them with `npm run db:demo -- --json`, and drives Chromium through the journeys —
-then audits every page against WCAG 2.1 AA with axe.
+3402/3403 for the government one, 3404/3405 for the security agency one,
+3406/3407 for the emergency one), seeds them with `npm run db:demo -- --json`,
+and drives Chromium through the journeys — then audits every page against WCAG
+2.1 AA with axe.
 
-All three run in ordered projects, and `provision` is always the first: it signs
+All four run in ordered projects, and `provision` is always the first: it signs
 each account in for the first time and makes it choose a passphrase, which is
 both the first journey and how the other projects get a session. The government
 suite then runs `registration`, `counter` and `oversight` as three _different_
-officers, and the security suite runs `investigation`, `missing-persons` and
-`supervision` as three different officers of _one_ agency — which is the point.
-An entitlement test that runs as one account proves very little, and the claim
-the security portal has to make is that being in the Police Command is not the
-same as being on the case. `accessibility` runs last in all three, so the pages
-it audits hold the records the journeys created: an empty table hides most of the
-mistakes a populated one makes.
+officers; the security suite runs `investigation`, `missing-persons` and
+`supervision` as three different officers of _one_ agency; the emergency suite
+runs `fleet`, `control` and `crew`, the last of those on a phone-sized viewport
+because that is where the portal is actually read. An entitlement test that runs
+as one account proves very little, and each of those casts exists to make one
+claim checkable: that being in the Police Command is not the same as being on the
+case, and that a technical role carries no entitlement to citizen data at all.
+`accessibility` runs last in all four, so the pages it audits hold the records
+the journeys created: an empty table hides most of the mistakes a populated one
+makes.
 
 Chromium has to be present: `npx playwright install chromium`. Playwright is
 pinned exactly, because a minor bump expects a different browser revision than the
@@ -263,7 +270,7 @@ there a case or incident and is the account on it.
 
 ## Working on a portal
 
-All three portals render on the server and hold the session; see
+All four portals render on the server and hold the session; see
 [ADR 0005](adr/0005-portal-holds-the-session.md) for why. Four rules follow from
 that and are worth keeping:
 
@@ -275,7 +282,8 @@ that and are worth keeping:
   and an absent record must not look the same (§29).
 - **It has to work without JavaScript.** Forms are Server Actions and navigation
   is links. Reach for a client component only when there is no other way, as with
-  the opt-in location control on the citizen portal's report page.
+  the opt-in location control on the citizen portal's report page and the
+  unit's own position report in the emergency portal.
 - **Anything shared goes in `packages/portal-kit`.** The platform's vocabulary
   does not: "Viewed your record" and "Opened a citizen record" are one audit row
   described to two audiences, and a shared label would be wrong for one of them.

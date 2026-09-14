@@ -144,5 +144,29 @@ services:
     security_opt: ['no-new-privileges:true']
     cap_drop: ['ALL']
 
+  emergency-portal:
+    build:
+      context: .
+      dockerfile: apps/emergency/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3400
+      PCID_API_URL: http://api:3000
+      # A sixth key. Each portal seals its own session cookie, so a compromise of
+      # one does not produce a usable cookie for any other.
+      EMERGENCY_PORTAL_SESSION_KEY: ${EMERGENCY_PORTAL_SESSION_KEY:?set EMERGENCY_PORTAL_SESSION_KEY}
+      # Twelve hours, and the longest of the four — deliberately. A crew locked
+      # out mid-job writes the passphrase on the dashboard. What keeps the risk
+      # down here is the reach, not the timeout.
+      EMERGENCY_PORTAL_SESSION_TTL_SECONDS: 43200
+      EMERGENCY_PORTAL_ALLOWED_ORIGINS: http://localhost:3400
+    ports: ['3400:3400']
+    depends_on:
+      api: { condition: service_started }
+    read_only: true
+    tmpfs: ['/tmp']
+    security_opt: ['no-new-privileges:true']
+    cap_drop: ['ALL']
+
 volumes:
   postgres-data:

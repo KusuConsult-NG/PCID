@@ -2,6 +2,25 @@
 
 For dispatchers, incident officers and field responders.
 
+## The portal
+
+`apps/emergency` is this guide made into an interface, at
+`http://localhost:3400` in development. Two very different screens share it: the
+board on a control-room wall, and a tablet in a vehicle.
+
+Sign in with your work email address and the six-digit code from your
+authenticator. If an administrator chose your passphrase you will be made to
+replace it before anything opens.
+
+The navigation is built from the entitlements your account actually holds, read
+from the same list the policy engine reads. Control sees the board and
+dispatching; a crew sees the person in front of them; a fleet office sees the
+vehicles and nothing about any person at all. Each sees only what it can use.
+
+Everything below is reachable from it. The HTTP is shown because integrators and
+mobile clients need it, and because it is the honest description of what the
+portal does on your behalf.
+
 ## How access works in an emergency
 
 Your access is bound to an **incident**. Creating one opens access for the people
@@ -33,6 +52,32 @@ Coordinates are recorded with **how they were obtained** — caller-supplied,
 responder-observed, or from a government record — and with a retention date.
 An incident location is an observation about an event. The platform holds no way
 to locate a person, and nothing here creates one.
+
+## The fleet
+
+A unit is a vehicle and a crew. Registering one is administration, not access to
+anybody's record — which is why a technical role that deliberately carries no
+data entitlement at all can own the fleet:
+
+```http
+POST  /api/v1/response-units    { "unitCode": "AMB-JOS-01", "type": "AMBULANCE", ... }
+PATCH /api/v1/response-units/AMB-JOS-01   { "status": "AVAILABLE" }
+```
+
+Status here is limited to `AVAILABLE` and `OFFLINE` — putting a unit into service
+and taking it out. The operational statuses belong to the dispatch workflow,
+which knows whether they are true; a fleet screen that could write them would let
+somebody mark an ambulance available while it is carrying a patient. A unit out
+on a job is stood down from the incident, not from the fleet.
+
+There is no position field. Where a unit is, is something the unit says:
+
+```http
+POST /api/v1/response-units/AMB-JOS-01/position  { "latitude": 9.9, "longitude": 8.86 }
+```
+
+That is the only live position the platform holds, it is reported by the unit
+about itself, and there is no citizen equivalent anywhere (§16, §64).
 
 ## Dispatching
 
@@ -95,7 +140,21 @@ mistyped identifier before a lookup happens.
 
 You get nothing — and the refusal does not confirm the incident exists.
 
-Ask control to attach you, which is the normal path and takes seconds. If the
+Ask control to attach you, which is the normal path and takes seconds:
+
+```http
+POST /api/v1/incidents/INC-2026-000123/officers
+{ "userId": "…", "role": "RESPONDER" }
+```
+
+Your service is attached on its own as soon as one of its units is sent, so this
+is for the individual case: a paramedic from another service, an incident officer
+taking a handover, a commander joining a major incident.
+
+Whoever does it must be on the incident themselves. Attaching somebody is the act
+that opens the casualties' details to them, so an account that could attach
+itself to any live incident would undo the control the incident exists to be.
+A closed incident authorises nothing, so nobody can be added to one. If the
 person is in front of you and waiting causes harm, use break glass:
 
 ```http
@@ -158,8 +217,17 @@ PATCH /api/v1/incidents/INC-2026-000123/status
 { "status": "CLOSED" }
 ```
 
-Closing ends the access the incident authorised. A later attempt says the incident
-is closed, which is the correct and useful answer.
+Resolving it ends the access it authorised: a later attempt on somebody's
+emergency profile says the incident is closed, which is the correct and useful
+answer. Closing it afterwards is the last act.
+
+The incident record itself stays readable to the people who were on it. That is
+not an oversight — it is where an incident differs from a case file. A case file
+lists its subjects by identifier with the reason each was linked, so closing a
+case closes the file. An incident record names no citizen at all: it is what
+happened, which units went, and how long each step took. A service that could not
+read back a job it attended could not debrief it, answer a complaint about it, or
+check the response times it is measured on.
 
 ## What control sees
 

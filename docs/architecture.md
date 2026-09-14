@@ -17,34 +17,36 @@ and there is exactly one component that decides it.
 ```
   Resident's browser  ──►  apps/portal      ─┐
                            (their own record) │
-                                              │   ┌────────────────────────────────────────┐
-  Counter officer     ──►  apps/government   ─┼──►│            services/api                │
-                           (anybody's, under  │   │                                        │
-                            a stated purpose) │   │  Guard ─► Controller ─► PolicyService ─┼─► @pcid/policy
-                                              │   │            │              │            │   (pure, no I/O)
-  Investigator        ──►  apps/security     ─┤   │            │              ▼            │
-                           (only under a case │   │            │        AuditService ──────┼─► audit_event
-                            they are on)      │   │            │                           │   (hash chained)
-  MDA systems  ───────────────────────────────┤   │            ▼                           │
-  Mobile apps  ───────────────────────────────┘   │        Domain service ─────────────────┼─► PostgreSQL
-                                                  └────────────────────────────────────────┘
-                                                                      ▲
-                                                                      │ projections only,
-                                                               Integration adapters   never write-back
+                                              │
+  Counter officer     ──►  apps/government   ─┤   ┌────────────────────────────────────────┐
+                           (anybody's, under  │   │            services/api                │
+                            a stated purpose) │   │                                        │
+                                              ├──►│  Guard ─► Controller ─► PolicyService ─┼─► @pcid/policy
+  Investigator        ──►  apps/security     ─┤   │            │              │            │   (pure, no I/O)
+                           (only under a case │   │            │              ▼            │
+                            they are on)      │   │            │        AuditService ──────┼─► audit_event
+                                              │   │            │                           │   (hash chained)
+  Control and crews   ──►  apps/emergency    ─┤   │            ▼                           │
+                           (only under a live │   │        Domain service ─────────────────┼─► PostgreSQL
+                            incident)         │   └────────────────────────────────────────┘
+                                              │                       ▲
+  MDA systems  ───────────────────────────────┤                       │ projections only,
+  Mobile apps  ───────────────────────────────┘                Integration adapters   never write-back
                                                                       ▲
                                                                 Agency systems
 ```
 
-All three portals are server-rendered and hold their own session; none puts a
+All four portals are server-rendered and hold their own session; none puts a
 token in a browser. They share `packages/portal-kit` for exactly that reason -
-three copies of a session-sealing routine is two copies that quietly stop being
+four copies of a session-sealing routine is three copies that quietly stop being
 reviewed. Each seals its cookie with its own key and sets its own idle timeout,
 so a compromise of one produces nothing usable against another.
 
-What they do not share is vocabulary. The same audit row is described three
-ways, because "your record was opened", "the record was released to you at the
-counter" and "opened under CASE-2026-00928" are the same event told to three
-audiences, and one wording would be wrong for two of them.
+What they do not share is vocabulary. The same audit row is described four ways,
+because "your record was opened", "the record was released to you at the
+counter", "opened under CASE-2026-00928" and "read at the scene of
+INC-2026-000123" are the same event told to four audiences, and one wording
+would be wrong for three of them.
 
 ### `packages/contracts` — the vocabulary
 
@@ -206,6 +208,43 @@ door with no handle on the far side.
 says that plainly. An officer who finds nothing concludes the platform cannot do
 it, and then does something worse.
 
+### `apps/emergency` — what a control room and a crew see
+
+The fourth portal is read in two very different places, and the design answers
+both: a board on a control-room wall, eight feet away, and a tablet in a moving
+ambulance at three in the morning.
+
+**The board says the severity in words as well as in colour**, sorts what is
+most urgent to the top without anybody clicking a column, and puts a call that
+has had nothing sent to it above one of the same severity that has. Some of the
+people reading a screen across a room cannot tell red from amber, and none of
+them should have to sort a list during a fire.
+
+**The identify screen asks two things.** Which incident, and the identifier on
+the credential — filled in from the incident the crew said they were attending.
+It states, above the button, exactly what will come back and exactly what will
+not, because a responder who expects an address and receives none will think the
+system is broken rather than that it is working.
+
+**The profile is ordered clinically, not alphabetically.** What keeps somebody
+alive is at the top, who to telephone is next, and the identifying details are
+last. A screen that made a responder scroll past a postcode to find a blood
+group would be a worse screen even if it released exactly the same fields.
+
+**The session lasts twelve hours, the longest of the four.** That is the
+opposite of what a risk table alone would say and it is deliberate: a crew
+locked out mid-job writes the passphrase on the dashboard, and then the control
+is worse than none. What holds the risk down here is the reach — the minimum
+necessary set, under a live incident the account is attached to — and not the
+timeout.
+
+**A finished incident is still a record.** Closing ends the access it granted to
+the people on it, and the incident itself stays readable to those who were on
+it. That is where an incident differs from a case: a case file lists its subjects
+by identifier with the reason each was linked, so closing a case closes the file;
+an incident record names no citizen at all, and a service that cannot read back
+a job it attended cannot debrief it or answer a complaint about it.
+
 ## Decisions worth explaining
 
 ### The token carries identity, not entitlements
@@ -331,12 +370,8 @@ local state, so a move to Kubernetes is a deployment change rather than a redesi
 
 ## What is not built yet
 
-The API and the three portals are the surface today. Still to build:
+The API and the four portals are the surface today. Still to build:
 
-- **A web portal for emergency services**. The API returns everything it needs,
-  including which cards are restricted and why, so the interface can say
-  "Restricted information" honestly — which is what the three existing portals
-  already do.
 - **Mobile applications** for citizens, field officers and responders, including
   the controlled offline mode described in §56 — encrypted, expiring,
   device-bound, minimal, revocable, and never a copy of the registry.

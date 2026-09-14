@@ -246,13 +246,18 @@ export class IncidentsService {
         [row.id],
       ),
       this.db.query<{
+        id: string;
         unit_code: string;
         type: string;
         status: string;
         dispatched_at: Date;
         arrived_at: Date | null;
       }>(
-        `SELECT ru.unit_code, ru.type, d.status, d.dispatched_at, d.arrived_at
+        // The dispatch id travels with the unit, because moving a dispatch along
+        // is addressed by id and a crew reading this page is the one who has to
+        // do it. Without it the acknowledge-and-arrive steps are reachable only
+        // by whoever kept the response to the original dispatch call.
+        `SELECT d.id, ru.unit_code, ru.type, d.status, d.dispatched_at, d.arrived_at
            FROM dispatch d JOIN response_unit ru ON ru.id = d.response_unit_id
           WHERE d.incident_id = $1 ORDER BY d.dispatched_at`,
         [row.id],
@@ -274,6 +279,7 @@ export class IncidentsService {
         detail: entry.detail,
       })),
       responseUnits: dispatches.map((entry) => ({
+        dispatchId: entry.id,
         unitCode: entry.unit_code,
         type: entry.type,
         status: entry.status,

@@ -153,7 +153,11 @@ const OFFICERS: readonly DemoOfficer[] = [
     fullName: 'Ambulance Crew',
     agencyCode: 'PLT-EMS',
     roles: ['EMERGENCY_RESPONDER'],
-    clearance: 'CONFIDENTIAL',
+    // Blood group and the conditions a resident chose to disclose for exactly
+    // this moment are HIGHLY_RESTRICTED, and recording somebody found is a
+    // SENSITIVE act. A responder below that ceiling holds the actions and can
+    // exercise none of them.
+    clearance: 'HIGHLY_RESTRICTED',
   },
   {
     // Fleet administration. A technical role by design: it registers vehicles

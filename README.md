@@ -28,15 +28,16 @@ supplied one, and is never required to obtain a PCID.
 | Citizen portal (`apps/portal`)                                | Complete                                   |
 | Government portal (`apps/government`)                         | Complete                                   |
 | Security agency portal (`apps/security`)                      | Complete                                   |
+| Emergency response portal (`apps/emergency`)                  | Complete                                   |
 | Oversight: duplicate, correction and alert queues             | Complete                                   |
-| Emergency response portal; mobile; GIS map                    | Not started — see [Roadmap](#roadmap)      |
+| Mobile applications; GIS command map                          | Not started — see [Roadmap](#roadmap)      |
 
-Four things run: the REST API, documented in OpenAPI at `/api/v1/docs` (and
-written to `docs/openapi.json` by `npm run openapi`), and three portals — one
-for residents, one for government counters, one for security agencies. Every
-portal is a client of that API like any other: none holds a database credential
-or a signing key, and each is authorised exactly as the person signed into it
-is.
+Five things run: the REST API, documented in OpenAPI at `/api/v1/docs` (and
+written to `docs/openapi.json` by `npm run openapi`), and four portals — for
+residents, for government counters, for security agencies, and for emergency
+control rooms and crews. Every portal is a client of that API like any other:
+none holds a database credential or a signing key, and each is authorised
+exactly as the person signed into it is.
 
 ## The idea in one paragraph
 
@@ -63,6 +64,8 @@ apps/government       The government portal: search under a stated purpose, the
                       registration desk, and the oversight queues.
 apps/security         The security agency portal: case files, case-bound access
                       to the register, missing and unidentified persons.
+apps/emergency        The emergency response portal: the board, dispatch, and
+                      the minimum necessary profile under a live incident.
 db/migrations         Version-controlled schema migrations.
 docs/                 Architecture, security, privacy, operations and guides.
 ```
@@ -112,10 +115,12 @@ export PCID_API_URL=http://127.0.0.1:3000
 export PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
 export GOVERNMENT_PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
 export SECURITY_PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+export EMERGENCY_PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
 
 npm run dev:portal       # http://localhost:3100 — residents
 npm run dev:government   # http://localhost:3200 — counter officers
 npm run dev:security     # http://localhost:3300 — security agencies
+npm run dev:emergency    # http://localhost:3400 — control rooms and crews
 ```
 
 Sign in with the credentials `npm run db:demo` printed: the resident with their
@@ -129,7 +134,7 @@ Or bring the whole stack up with Docker:
 ```bash
 export TOKEN_SIGNING_KEY=... SECRET_ENCRYPTION_KEY=... \
        PORTAL_SESSION_KEY=... GOVERNMENT_PORTAL_SESSION_KEY=... \
-       SECURITY_PORTAL_SESSION_KEY=...
+       SECURITY_PORTAL_SESSION_KEY=... EMERGENCY_PORTAL_SESSION_KEY=...
 docker compose up --build
 ```
 
@@ -137,7 +142,7 @@ docker compose up --build
 
 ```bash
 npm run verify              # format, lint, typecheck, unit and integration tests
-npm run test:e2e            # all three portals, in a browser, end to end
+npm run test:e2e            # all four portals, in a browser, end to end
 ```
 
 `npm run test:integration` compiles with `tsc` and runs against the compiled
@@ -148,7 +153,7 @@ than the one that ships.
 The integration suite creates and drops its own databases; point
 `TEST_ADMIN_DATABASE_URL` at a PostgreSQL superuser connection.
 
-`npm run test:e2e` runs all three portal suites. Each starts an API and a portal
+`npm run test:e2e` runs all four portal suites. Each starts an API and a portal
 of its own, against a database it recreates for the run, seeds them with `npm run
 db:demo`, and drives a real browser through the journeys — including an
 accessibility audit of every page against WCAG 2.1 AA. They need a Chromium
@@ -215,14 +220,14 @@ These are absences by design, and each is held by a test:
 
 Delivered: platform foundation, authentication and authorisation, MDA
 administration, the PCID and citizen registry, the citizen portal, the
-government portal and its oversight queues, the security agency portal, the data
-exchange and integration framework, asset registry integration, emergency
-response, security and case management, missing and unidentified persons, and
-analytics.
+government portal and its oversight queues, the security agency portal, the
+emergency response portal, the data exchange and integration framework, asset
+registry integration, emergency response, security and case management, missing
+and unidentified persons, and analytics.
 
-Remaining before a pilot: the emergency response web portal; the citizen, field
-officer and responder mobile applications; the GIS
-command map; the notification delivery workers; load testing; and an independent
+Remaining before a pilot: the citizen, field officer and responder mobile
+applications; the GIS command map; the notification delivery workers; load
+testing; and an independent
 security assessment. [docs/architecture.md](docs/architecture.md#what-is-not-built-yet)
 sets out what each needs.
 

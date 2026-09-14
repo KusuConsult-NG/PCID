@@ -11,6 +11,7 @@
    Citizen portal              API instance
    Government portal           API instance          (stateless, ≥2 each)
    Security agency portal
+   Emergency response portal
           └─────────────┬──────────────┘
                         │
         ┌───────────────┼────────────────┐
@@ -28,8 +29,9 @@ Redis: everything they know, they asked the API for, as the person signed into
 them.
 
 The government portal should be reachable only from the government network, the
-security agency portal only from the security network within it, and the citizen
-portal from the public internet. That is a gateway decision, not an
+security agency portal only from the security network within it, the emergency
+portal from the government network and from the mobile network the crews' devices
+use, and the citizen portal from the public internet. That is a gateway decision, not an
 application one — the platform authorises identically either way — but it is the
 cheapest additional control available and there is no reason not to take it.
 
@@ -58,9 +60,13 @@ And on the portal tier, which shares none of the above:
 | `PORTAL_SESSION_TTL_SECONDS` | How long an idle portal session lasts before signing in again             |
 | `PORTAL_ALLOWED_ORIGINS`     | The portal's own public origins; a Server Action from anywhere else fails |
 
-Each portal has its own set of these, prefixed `PORTAL_`, `GOVERNMENT_PORTAL_`
-and `SECURITY_PORTAL_`. The keys must all differ: one key per portal is what
-makes a stolen cookie from one useless against another.
+Each portal has its own set of these, prefixed `PORTAL_`, `GOVERNMENT_PORTAL_`,
+`SECURITY_PORTAL_` and `EMERGENCY_PORTAL_`. The keys must all differ: one key per
+portal is what makes a stolen cookie from one useless against another.
+
+The emergency portal's idle timeout is twelve hours, the longest of the four, and
+that is deliberate rather than an oversight — see
+[Security](security.md#the-portals). Do not shorten it without reading why.
 
 Rotating a portal's session key invalidates every session in that portal, which
 signs everybody using it out. Nothing else is lost: the cookie is the only thing
@@ -133,6 +139,8 @@ docker build -f apps/government/Dockerfile \
   -t pcid-government-portal:$(git rev-parse --short HEAD) .
 docker build -f apps/security/Dockerfile \
   -t pcid-security-portal:$(git rev-parse --short HEAD) .
+docker build -f apps/emergency/Dockerfile \
+  -t pcid-emergency-portal:$(git rev-parse --short HEAD) .
 ```
 
 The API runtime image carries compiled JavaScript, production dependencies and
@@ -208,9 +216,9 @@ Deliberately not a formality:
 - [ ] Every agency's data-sharing agreement status reflects a signed agreement
 - [ ] Compartment grants reviewed, each with a stated legal basis
 - [ ] Bootstrap administrator's recovery codes stored securely offline
-- [ ] All five keys distinct, from the secrets manager, never logged
+- [ ] All six keys distinct, from the secrets manager, never logged
 - [ ] Every portal reaches the API over the internal network only
-- [ ] Neither the government nor the security portal is reachable from the public internet
+- [ ] Only the citizen portal is reachable from the public internet
 - [ ] `*_ALLOWED_ORIGINS` list exactly each portal's public origins
 - [ ] Every portal served over TLS, so their session cookies are accepted as `Secure`
 - [ ] Load testing performed — **not yet done**

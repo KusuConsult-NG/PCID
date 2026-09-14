@@ -257,8 +257,8 @@ describe('incident binding gate (§9, §10)', () => {
     assert.equal(outsider.reasons[0]?.code, 'NOT_ASSIGNED_TO_INCIDENT');
   });
 
-  test('a closed incident authorises nothing further, including its own record', () => {
-    const closed = evaluate(
+  test('a closed incident authorises nothing further, but is still readable', () => {
+    const changing = evaluate(
       request({
         subject: subject(['INCIDENT_OFFICER'], { userId: 'usr-control', agencyId: 'agy-ems' }),
         action: 'INCIDENT_UPDATE',
@@ -270,8 +270,42 @@ describe('incident binding gate (§9, §10)', () => {
         }),
       }),
     );
-    assert.equal(closed.effect, 'DENY');
-    assert.equal(closed.reasons[0]?.code, 'INCIDENT_NOT_ACTIVE');
+    assert.equal(changing.effect, 'DENY');
+    assert.equal(changing.reasons[0]?.code, 'INCIDENT_NOT_ACTIVE');
+
+    // The record itself is operational, not personal: what happened, which units
+    // went, how long each step took. A service that cannot read back a job it
+    // attended cannot debrief it or answer a complaint about it.
+    const reading = evaluate(
+      request({
+        subject: subject(['INCIDENT_OFFICER'], { userId: 'usr-control', agencyId: 'agy-ems' }),
+        action: 'INCIDENT_VIEW',
+        purpose: 'EMERGENCY_RESPONSE',
+        resource: resource('INCIDENT', { classification: 'CONFIDENTIAL', subjectPcid: null }),
+        incidentContext: incidentContext({
+          status: 'CLOSED',
+          assignedUserIds: ['usr-control'],
+        }),
+      }),
+    );
+    assert.equal(reading.effect, 'PERMIT');
+
+    // And the emergency profiles it authorised are a separate read, which stays
+    // refused: that is the access closing was supposed to end.
+    const profile = evaluate(
+      request({
+        subject: subject(['EMERGENCY_RESPONDER'], { userId: 'usr-crew', agencyId: 'agy-ems' }),
+        action: 'EMERGENCY_PROFILE_VIEW',
+        purpose: 'EMERGENCY_RESPONSE',
+        resource: resource('CITIZEN'),
+        incidentContext: incidentContext({
+          status: 'CLOSED',
+          assignedUserIds: ['usr-crew'],
+        }),
+      }),
+    );
+    assert.equal(profile.effect, 'DENY');
+    assert.equal(profile.reasons[0]?.code, 'INCIDENT_NOT_ACTIVE');
   });
 
   test('sending your own unit is how an agency joins, so dispatch is not bound', () => {
