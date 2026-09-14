@@ -408,7 +408,9 @@ npm run load:probe -- --chain 2000 --concurrency 16
 npm run load:run -- --users 100 --think 3000 --duration 120 --profile counter
 npm run load:run -- --users 100 --think 3000 --duration 120 --profile surge
 
-# Take it all out again.
+# Take it all out again. Batched, because a single delete over four million rows
+# exceeds the statement timeout - which is how the first version of this tool
+# found that it could not undo the dataset it had just written.
 npm run db:load-seed -- --remove
 ```
 

@@ -55,7 +55,12 @@ async function main(): Promise<void> {
 
   try {
     if (process.argv.includes('--remove')) {
-      const removed = await removeVolume(db, env);
+      let lastRemoveReport = 0;
+      const removed = await removeVolume(db, env, (stage, done) => {
+        if (Date.now() - lastRemoveReport < 2_000) return;
+        lastRemoveReport = Date.now();
+        process.stdout.write(`  ${stage.padEnd(26)} ${String(done).padStart(9)} removed\n`);
+      });
       const lines = Object.entries(removed).map(
         ([table, count]) => `  ${table.padEnd(26)} ${count}`,
       );

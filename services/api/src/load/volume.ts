@@ -45,6 +45,8 @@ export type { LoadPersona, LoadAccount, LoadManifest } from './personas';
 /** Postgres accepts 65535 parameters per statement; batches stay well inside it. */
 const CITIZEN_BATCH = 500;
 const GENERIC_BATCH = 1_000;
+/** Rows per delete when the dataset is taken out again. */
+const REMOVE_BATCH = 20_000;
 
 export interface VolumeOptions {
   readonly citizens: number;
@@ -724,94 +726,152 @@ function buildInsert(
 }
 
 /** Remove everything the harness created, in dependency order. */
-export async function removeVolume(db: Database, env: Env): Promise<Record<string, number>> {
+export async function removeVolume(
+  db: Database,
+  env: Env,
+  report: ProgressReport = () => undefined,
+): Promise<Record<string, number>> {
   if (env.NODE_ENV === 'production') {
     throw new Error('Load volume must never be removed in production - there is none.');
   }
+  const agencies = await db.query<{ id: string }>('SELECT id FROM agency WHERE code LIKE $1', [
+    `${LOAD_AGENCY_PREFIX}%`,
+  ]);
+  const agencyIds = agencies.map((row) => row.id);
+
+  // Deleted in batches, each its own transaction.
+  //
+  // Not a style choice: the pool sets a statement timeout, and a single
+  // `DELETE FROM citizen` over four million rows exceeds it - the first version
+  // of this tool did exactly that and could not undo the dataset it had just
+  // written. A bounded batch also keeps the lock footprint small enough that
+  // nothing else waiting on these tables stalls for minutes.
+  const steps: readonly [string, string, readonly unknown[]][] = [
+    [
+      'case_subject',
+      `DELETE FROM case_subject WHERE ctid IN (
+         SELECT cs.ctid FROM case_subject cs
+          WHERE cs.case_id IN (SELECT id FROM investigation_case WHERE agency_id = ANY($1::uuid[]))
+          LIMIT ${REMOVE_BATCH})`,
+      [agencyIds],
+    ],
+    [
+      'case_assignment',
+      `DELETE FROM case_assignment WHERE ctid IN (
+         SELECT ca.ctid FROM case_assignment ca
+          WHERE ca.case_id IN (SELECT id FROM investigation_case WHERE agency_id = ANY($1::uuid[]))
+          LIMIT ${REMOVE_BATCH})`,
+      [agencyIds],
+    ],
+    [
+      'investigation_case',
+      `DELETE FROM investigation_case WHERE ctid IN (
+         SELECT ctid FROM investigation_case WHERE agency_id = ANY($1::uuid[]) LIMIT ${REMOVE_BATCH})`,
+      [agencyIds],
+    ],
+    [
+      'dispatch',
+      `DELETE FROM dispatch WHERE ctid IN (
+         SELECT d.ctid FROM dispatch d
+          WHERE d.incident_id IN (SELECT id FROM incident WHERE lead_agency_id = ANY($1::uuid[]))
+          LIMIT ${REMOVE_BATCH})`,
+      [agencyIds],
+    ],
+    [
+      'incident',
+      `DELETE FROM incident WHERE ctid IN (
+         SELECT ctid FROM incident WHERE lead_agency_id = ANY($1::uuid[]) LIMIT ${REMOVE_BATCH})`,
+      [agencyIds],
+    ],
+    [
+      'response_unit',
+      `DELETE FROM response_unit WHERE ctid IN (
+         SELECT ctid FROM response_unit WHERE agency_id = ANY($1::uuid[]) LIMIT ${REMOVE_BATCH})`,
+      [agencyIds],
+    ],
+    // Two markers, because a load run creates registry rows two ways. The bulk
+    // are written by the seeder and carry the LOAD_TEST channel. The rest are
+    // written by the run itself through the registration endpoint, like any
+    // other registration - which is the point of exercising it, and means they
+    // carry an ordinary channel. The telephone number marks those: the 0700
+    // block is not allocated to any Nigerian operator, so no real record holds
+    // one. Emergency contacts go with their citizen by cascade.
+    [
+      'citizen',
+      `DELETE FROM citizen WHERE ctid IN (
+         SELECT ctid FROM citizen
+          WHERE registration_channel = $1 OR phone_primary LIKE $2
+          LIMIT ${REMOVE_BATCH})`,
+      [LOAD_CHANNEL, `${LOAD_PHONE_PREFIX}%`],
+    ],
+    [
+      'registration_request',
+      `DELETE FROM registration_request WHERE ctid IN (
+         SELECT ctid FROM registration_request
+          WHERE payload->>'phonePrimary' LIKE $1 LIMIT ${REMOVE_BATCH})`,
+      [`${LOAD_PHONE_PREFIX}%`],
+    ],
+    [
+      'user_role',
+      `DELETE FROM user_role WHERE ctid IN (
+         SELECT ur.ctid FROM user_role ur
+          WHERE ur.user_id IN (SELECT id FROM government_user WHERE agency_id = ANY($1::uuid[]))
+          LIMIT ${REMOVE_BATCH})`,
+      [agencyIds],
+    ],
+    [
+      'mfa_credential',
+      `DELETE FROM mfa_credential WHERE ctid IN (
+         SELECT mc.ctid FROM mfa_credential mc
+          WHERE mc.user_id IN (SELECT id FROM government_user WHERE agency_id = ANY($1::uuid[]))
+          LIMIT ${REMOVE_BATCH})`,
+      [agencyIds],
+    ],
+    [
+      'user_session',
+      `DELETE FROM user_session WHERE ctid IN (
+         SELECT us.ctid FROM user_session us
+          WHERE us.government_user_id IN (SELECT id FROM government_user WHERE agency_id = ANY($1::uuid[]))
+          LIMIT ${REMOVE_BATCH})`,
+      [agencyIds],
+    ],
+    [
+      'government_user',
+      `DELETE FROM government_user WHERE ctid IN (
+         SELECT ctid FROM government_user WHERE agency_id = ANY($1::uuid[]) LIMIT ${REMOVE_BATCH})`,
+      [agencyIds],
+    ],
+    [
+      'agency_compartment_grant',
+      `DELETE FROM agency_compartment_grant WHERE ctid IN (
+         SELECT ctid FROM agency_compartment_grant WHERE agency_id = ANY($1::uuid[]) LIMIT ${REMOVE_BATCH})`,
+      [agencyIds],
+    ],
+    [
+      'agency',
+      `DELETE FROM agency WHERE ctid IN (
+         SELECT ctid FROM agency WHERE id = ANY($1::uuid[]) LIMIT ${REMOVE_BATCH})`,
+      [agencyIds],
+    ],
+  ];
+
   const removed: Record<string, number> = {};
-  const counts = await db.transaction(async (runner) => {
-    const results: Record<string, number> = {};
-    const agencies = await runner.query<{ id: string }>(
-      'SELECT id FROM agency WHERE code LIKE $1',
-      [`${LOAD_AGENCY_PREFIX}%`],
-    );
-    const agencyIds = agencies.map((row) => row.id);
-    for (const [label, sql, params] of [
-      [
-        'case_subject',
-        'DELETE FROM case_subject WHERE case_id IN (SELECT id FROM investigation_case WHERE agency_id = ANY($1::uuid[]))',
-        [agencyIds],
-      ],
-      [
-        'case_assignment',
-        'DELETE FROM case_assignment WHERE case_id IN (SELECT id FROM investigation_case WHERE agency_id = ANY($1::uuid[]))',
-        [agencyIds],
-      ],
-      [
-        'investigation_case',
-        'DELETE FROM investigation_case WHERE agency_id = ANY($1::uuid[])',
-        [agencyIds],
-      ],
-      [
-        'dispatch',
-        'DELETE FROM dispatch WHERE incident_id IN (SELECT id FROM incident WHERE lead_agency_id = ANY($1::uuid[]))',
-        [agencyIds],
-      ],
-      ['incident', 'DELETE FROM incident WHERE lead_agency_id = ANY($1::uuid[])', [agencyIds]],
-      ['response_unit', 'DELETE FROM response_unit WHERE agency_id = ANY($1::uuid[])', [agencyIds]],
-      [
-        'emergency_contact',
-        'DELETE FROM emergency_contact WHERE citizen_id IN (SELECT id FROM citizen WHERE registration_channel = $1 OR phone_primary LIKE $2)',
-        [LOAD_CHANNEL, `${LOAD_PHONE_PREFIX}%`],
-      ],
-      // Two markers, because a load run creates registry rows two ways. The bulk
-      // are written by the seeder and carry the LOAD_TEST channel. The rest are
-      // written by the run itself through the registration endpoint, like any
-      // other registration - which is the point of exercising it, and means they
-      // carry an ordinary channel. The telephone number marks those: the 0700
-      // block is not allocated to any Nigerian operator, so no real record holds
-      // one.
-      [
-        'citizen',
-        'DELETE FROM citizen WHERE registration_channel = $1 OR phone_primary LIKE $2',
-        [LOAD_CHANNEL, `${LOAD_PHONE_PREFIX}%`],
-      ],
-      [
-        'user_role',
-        'DELETE FROM user_role WHERE user_id IN (SELECT id FROM government_user WHERE agency_id = ANY($1::uuid[]))',
-        [agencyIds],
-      ],
-      [
-        'mfa_credential',
-        'DELETE FROM mfa_credential WHERE user_id IN (SELECT id FROM government_user WHERE agency_id = ANY($1::uuid[]))',
-        [agencyIds],
-      ],
-      [
-        'user_session',
-        'DELETE FROM user_session WHERE government_user_id IN (SELECT id FROM government_user WHERE agency_id = ANY($1::uuid[]))',
-        [agencyIds],
-      ],
-      [
-        'government_user',
-        'DELETE FROM government_user WHERE agency_id = ANY($1::uuid[])',
-        [agencyIds],
-      ],
-      [
-        'agency_compartment_grant',
-        'DELETE FROM agency_compartment_grant WHERE agency_id = ANY($1::uuid[])',
-        [agencyIds],
-      ],
-      ['agency', 'DELETE FROM agency WHERE id = ANY($1::uuid[])', [agencyIds]],
-    ] as const) {
-      const rows = await runner.query<{ count: string }>(
+  const started = Date.now();
+  for (const [label, sql, params] of steps) {
+    let total = 0;
+    for (;;) {
+      const rows = await db.query<{ count: string }>(
         `WITH deleted AS (${sql} RETURNING 1) SELECT count(*)::text AS count FROM deleted`,
-        params as readonly unknown[],
+        params,
       );
-      results[label] = Number(rows[0]?.count ?? 0);
+      const deleted = Number(rows[0]?.count ?? 0);
+      total += deleted;
+      if (deleted > 0) report(label, total, total, Date.now() - started);
+      if (deleted < REMOVE_BATCH) break;
     }
-    return results;
-  });
-  Object.assign(removed, counts);
+    removed[label] = total;
+  }
+
   // The PCID allocations stay. They are append-only by design and by trigger:
   // an identifier issued once is never issued again, even a synthetic one.
   return removed;
