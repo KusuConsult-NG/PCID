@@ -73,5 +73,29 @@ services:
     security_opt: ['no-new-privileges:true']
     cap_drop: ['ALL']
 
+  portal:
+    build:
+      context: .
+      dockerfile: apps/portal/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3100
+      # Server-side only: the browser never calls the API directly, so this stays
+      # on the internal network.
+      PCID_API_URL: http://api:3000
+      # A third key, distinct from the API's two. The portal seals the resident's
+      # session cookie with it and holds nothing else.
+      PORTAL_SESSION_KEY: ${PORTAL_SESSION_KEY:?set PORTAL_SESSION_KEY}
+      PORTAL_SESSION_TTL_SECONDS: 1800
+      # Server Actions are rejected unless the submission came from here.
+      PORTAL_ALLOWED_ORIGINS: http://localhost:3100
+    ports: ['3100:3100']
+    depends_on:
+      api: { condition: service_started }
+    read_only: true
+    tmpfs: ['/tmp']
+    security_opt: ['no-new-privileges:true']
+    cap_drop: ['ALL']
+
 volumes:
   postgres-data:

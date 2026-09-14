@@ -7,9 +7,10 @@
                         │
                   API gateway (TLS, WAF, allow-listed origins)
                         │
-          ┌─────────────┴─────────────┐
-      API instance              API instance        (stateless, ≥2)
-          └─────────────┬─────────────┘
+          ┌─────────────┴──────────────┐
+   Portal instance             API instance
+   Portal instance             API instance          (stateless, ≥2 each)
+          └─────────────┬──────────────┘
                         │
         ┌───────────────┼────────────────┐
    PostgreSQL 16     Redis           Secrets manager
@@ -17,8 +18,13 @@
     standby)
 ```
 
-The API is stateless. Scaling out is adding instances; there is no local state in
-the container and nothing that assumes a single process.
+Both tiers are stateless. Scaling out is adding instances; there is no local
+state in either container and nothing that assumes a single process.
+
+The portal reaches the API over the internal network and is the only thing that
+needs to. It holds no database credential and no connection to PostgreSQL or
+Redis: everything it knows, it asked the API for, as the resident signed into
+it.
 
 ## Configuration
 
@@ -35,6 +41,18 @@ most:
 | `SECRET_ENCRYPTION_KEY`  | 32 bytes, base64url, **different** from the signing key               |
 | `ALLOW_SANDBOX_ADAPTERS` | Must be `false` in production; `true` is refused                      |
 | `AAL2_TTL_SECONDS`       | How long a step-up lasts. Shorter is safer and more annoying          |
+
+And on the portal tier, which shares none of the above:
+
+| Variable                     | Notes                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------- |
+| `PORTAL_SESSION_KEY`         | 32 bytes, base64url, **different** from both API keys                     |
+| `PCID_API_URL`               | Internal address of the API. Never a public one                           |
+| `PORTAL_SESSION_TTL_SECONDS` | How long an idle portal session lasts before signing in again             |
+| `PORTAL_ALLOWED_ORIGINS`     | The portal's own public origins; a Server Action from anywhere else fails |
+
+Rotating `PORTAL_SESSION_KEY` invalidates every portal session, which signs every
+resident out. Nothing else is lost: the cookie is the only thing sealed with it.
 
 Generate keys with:
 
@@ -98,19 +116,26 @@ always a new file.
 
 ```bash
 docker build -t pcid-api:$(git rev-parse --short HEAD) .
+docker build -f apps/portal/Dockerfile -t pcid-portal:$(git rev-parse --short HEAD) .
 ```
 
-The runtime image carries compiled JavaScript, production dependencies and the
-migration files. No source, no fixtures, no build toolchain. It runs as `node`,
-not root, and should be deployed read-only with a tmpfs at `/tmp`, no new
-privileges, and all capabilities dropped — `docker-compose.yml` shows the shape.
+The API runtime image carries compiled JavaScript, production dependencies and
+the migration files. The portal image carries the standalone server, the
+dependencies Next traced for it, and the static assets. Neither carries source,
+fixtures or a build toolchain; both run as `node`, not root, and should be
+deployed read-only with a tmpfs at `/tmp`, no new privileges, and all
+capabilities dropped — `docker-compose.yml` shows the shape.
+
+The portal image needs no secret to build. Its configuration is read at the point
+of use, so the same artefact is promoted from staging to production unchanged.
 
 ## Health checks
 
-| Endpoint               | Use                                                                      |
-| ---------------------- | ------------------------------------------------------------------------ |
-| `/api/v1/health/live`  | Liveness. No dependency checks; restart if it fails                      |
-| `/api/v1/health/ready` | Readiness. Returns 503 when the database or counter store is unreachable |
+| Endpoint               | Use                                                                                      |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
+| `/api/v1/health/live`  | Liveness. No dependency checks; restart if it fails                                      |
+| `/api/v1/health/ready` | Readiness. Returns 503 when the database or counter store is unreachable                 |
+| `/sign-in` (portal)    | The portal has no dependency of its own to check; serving its sign-in page is the signal |
 
 The identity service is mission-critical, so an instance that cannot reach the
 database removes itself from the load balancer rather than serving errors.
@@ -124,6 +149,11 @@ gateway must therefore be the only thing that can reach the instances.
 
 CORS is closed by default; allow-list the portal origins at the gateway. Apply
 gateway-level rate limiting in addition to the application's.
+
+The portal sets its own security headers, including a Content-Security-Policy
+with no third-party origin at all. Do not let the gateway relax them, and do not
+add an analytics or tag-manager origin to that policy: it would be a third party
+inside a page that renders a citizen's record.
 
 ## Observability
 
@@ -161,6 +191,10 @@ Deliberately not a formality:
 - [ ] Every agency's data-sharing agreement status reflects a signed agreement
 - [ ] Compartment grants reviewed, each with a stated legal basis
 - [ ] Bootstrap administrator's recovery codes stored securely offline
+- [ ] `PORTAL_SESSION_KEY` distinct from both API keys, from the secrets manager
+- [ ] Portal reaches the API over the internal network only
+- [ ] `PORTAL_ALLOWED_ORIGINS` lists exactly the portal's public origins
+- [ ] Portal served over TLS, so its session cookie is accepted as `Secure`
 - [ ] Load testing performed — **not yet done**
 - [ ] Independent security assessment performed — **not yet done**
 

@@ -163,19 +163,39 @@ searched for.
 | ------------------------ | ----------------------------------------------------------- | --------------------------------------------------- |
 | Authentication           | `/auth/*`                                                   | Sign in, second factor, rotation, sign out          |
 | Citizens                 | `/citizens/*`                                               | Search, view, Citizen 360, registration, duplicates |
-| Verification             | `/verification/pcid`                                        | Confirm a presented credential is live              |
+| Verification             | `/verification/pcid`, `/verification/credential`            | Confirm a presented identifier or scanned code      |
 | Emergency                | `/incidents/*`, `/dispatches/*`, `/response-units/*`        | Incidents, dispatch, units                          |
 | Emergency identification | `/citizens/{pcid}/emergency-profile`                        | Minimum necessary profile                           |
 | Cases                    | `/cases/*`                                                  | Cases, subjects, assignments, closure               |
 | Missing persons          | `/missing-persons/*`, `/unidentified-persons`, `/matches/*` | Registers and matching                              |
 | Authorisation            | `/access-requests/*`, `/break-glass/*`                      | Approvals and break glass                           |
 | Linked records           | `/vehicles/*`, `/properties/*`                              | Records other agencies own                          |
-| Citizen portal           | `/me/*`                                                     | Own record, contacts, access history, corrections   |
+| Citizen portal           | `/me/*`                                                     | Own record, credential, contacts, history, security |
 | Audit                    | `/audit/*`                                                  | Search and chain verification                       |
 | Analytics                | `/analytics/*`                                              | Aggregates with small-number suppression            |
 | Administration           | `/agencies/*`, `/users/*`                                   | Registry and user administration                    |
 | Integrations             | `/integrations/*`                                           | Data sources and synchronisation                    |
 | Operations               | `/health/*`                                                 | Liveness and readiness                              |
+
+## The citizen credential is a code, not a record
+
+`GET /me/credential` returns a resident's credential and a `verificationUrl` for
+the QR code they show at a counter. The URL carries an opaque token and nothing
+else: not the Plateau Citizen ID, not a name, not a signed assertion that could
+be read offline.
+
+The token authorises nothing by itself. `POST /verification/credential` resolves
+it only for an authenticated officer who holds the verification action, and
+answers with whether the credential is live and the name printed on it. That is
+the whole of the release. Expired, revoked and unrecognised codes are all
+reported plainly, so an officer knows to ask for a fresh one rather than guessing.
+
+The token expires in five minutes. A photograph of somebody's screen is therefore
+worth nothing shortly afterwards, and a resident who reports a credential lost
+invalidates every token issued against it at the same moment.
+
+Both kinds of check — a scanned code and a typed identifier — appear in the
+resident's own verification history, naming the office that made them.
 
 ## Versioning
 

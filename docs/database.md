@@ -123,6 +123,15 @@ justification and the officer who made it.
 Every coordinate carries `location_source` and, for incidents,
 `location_retention_until`.
 
+**`citizen_account` / `credential` / `credential_verification_token`** — the
+resident's own access. `citizen_account.must_change_password` is set when a
+passphrase is issued at a desk and cleared only when the resident replaces it, so
+a credential somebody else wrote down cannot stay in use. A `credential` is the
+thing that can be replaced when a card is lost; the Plateau Citizen ID it names
+is not. Verification tokens are short-lived by constraint, not by convention:
+`credential_token_display_is_short_lived` refuses a row whose lifetime exceeds
+fifteen minutes, so no future code path can quietly issue a long-lived one.
+
 **Linked-record projections** (`property`, `vehicle`, `business`, `licence`,
 `revenue_profile`) — each carries `source_agency_id`, `source_system`,
 `source_record_id`, `source_updated_at`, `last_synced_at` and

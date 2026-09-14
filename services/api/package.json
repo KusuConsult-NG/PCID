@@ -7,7 +7,7 @@
     "build": "tsc -b",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "start": "node dist/main.js",
-    "dev": "node --import tsx --watch src/main.ts",
+    "dev": "node scripts/dev.mjs",
     "db:migrate": "node --import tsx src/database/migrate-cli.ts",
     "db:seed": "node --import tsx src/database/seed-cli.ts",
     "openapi": "node --import tsx src/common/openapi/emit-cli.ts",
@@ -15,7 +15,8 @@
     "test:unit": "node --import tsx --test \"test/unit/**/*.test.ts\"",
     "test:integration": "npm run build:test && node --test --test-concurrency=1 \"dist-test/test/integration/**/*.test.js\"",
     "db:bootstrap": "node --import tsx src/database/bootstrap-cli.ts",
-    "build:test": "tsc -p tsconfig.test.json"
+    "build:test": "tsc -p tsconfig.test.json",
+    "db:demo": "node --import tsx src/database/demo-cli.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",

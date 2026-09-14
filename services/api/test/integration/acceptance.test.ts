@@ -748,6 +748,14 @@ describe('§85 final system acceptance', () => {
       body.accesses.some((entry) => entry.purpose === 'SERVICE_DELIVERY'),
       'the citizen sees the revenue service delivery access',
     );
+    assert.ok(
+      body.accesses.some((entry) => entry.agency === 'Plateau State Internal Revenue Service'),
+      'and the office is named, not quoted at them as an internal code (§26)',
+    );
+    assert.equal(
+      body.accesses.some((entry) => entry.agency === 'PLT-REVENUE'),
+      false,
+    );
     assert.equal(
       body.accesses.some((entry) => entry.purpose === 'CRIMINAL_INVESTIGATION'),
       false,

@@ -336,3 +336,33 @@ export const agencyStatusSchema = z.object({
 });
 
 export const verifySchema = z.object({ pcid: pcidSchema });
+
+/* --- Citizen portal (§17, §39, §40, §58) ---------------------------------- */
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(256),
+  newPassword: z.string().min(14).max(256),
+});
+
+export const confirmCodeSchema = z.object({ code: z.string().min(4).max(16) });
+
+export const credentialRevokeSchema = z.object({
+  reason: z.string().min(5).max(500),
+});
+
+export const verifyCredentialSchema = z.object({
+  token: z.string().min(16).max(256),
+});
+
+export const emergencyRequestSchema = z.object({
+  type: z.enum(INCIDENT_TYPES as unknown as [string, ...string[]]).default('MEDICAL_EMERGENCY'),
+  description: z.string().min(5).max(2000),
+  latitude: z.number().min(-90).max(90).nullish(),
+  longitude: z.number().min(-180).max(180).nullish(),
+  contactPhone: z.string().max(24).nullish(),
+});
+
+export const citizenReportSchema = z.object({
+  description: z.string().min(10).max(4000),
+  accessReference: z.string().max(128).nullish(),
+});

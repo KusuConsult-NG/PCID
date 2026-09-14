@@ -110,6 +110,11 @@ export class AuditController {
         citizenVisibility: row.citizen_visibility,
         restrictionBasis: row.restriction_basis,
         correlationId: row.correlation_id,
+        // What the action actually did: which change, which reference, which
+        // stated reason. An oversight review needs this, and by the platform's
+        // logging discipline it carries identifiers and outcomes rather than
+        // record values. It is never included in the citizen-facing history.
+        detail: row.detail,
       })),
     };
   }

@@ -10,7 +10,8 @@
   "workspaces": [
     "packages/contracts",
     "packages/policy",
-    "services/api"
+    "services/api",
+    "apps/portal"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
@@ -23,15 +24,20 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:migrate": "npm run db:migrate --workspace services/api",
     "db:seed": "npm run db:seed --workspace services/api",
+    "db:demo": "npm run db:demo --workspace services/api",
     "start:api": "npm run start --workspace services/api",
     "dev:api": "npm run dev --workspace services/api",
     "openapi": "npm run openapi --workspace services/api",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test"
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test",
+    "dev:portal": "npm run dev --workspace @pcid/portal",
+    "test:e2e": "npm run test:e2e --workspace @pcid/portal"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
+    "@playwright/test": "1.56.1",
     "@types/node": "^22.18.0",
     "eslint": "^9.39.0",
+    "playwright-core": "1.56.1",
     "prettier": "^3.6.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",

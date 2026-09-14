@@ -69,7 +69,12 @@ has not been altered.
 ## Transparency to the citizen
 
 A resident can see, in the citizen portal, which agency accessed their record,
-when, for what purpose, and what kind of access it was.
+when, for what purpose, and what kind of access it was. The agency is named —
+"Plateau State Internal Revenue Service", not "PLT-REVENUE" — because a right of
+access that answers in the government's internal shorthand has not been honoured.
+Each entry carries a reference the resident can quote when challenging it, and
+the audit record it refers to cannot be altered or deleted by anyone, so it is
+still there when the Data Protection Officer looks.
 
 Access made under an active criminal investigation is withheld, because telling
 the subject of an investigation that they are being investigated defeats it. That
@@ -133,7 +138,7 @@ Alerts describe records and events, never people. "Identity Integrity Alert", no
 
 | Right         | Today                                                                                       |
 | ------------- | ------------------------------------------------------------------------------------------- |
-| Access        | Citizen portal: own record and access history (API complete, portal not built)              |
+| Access        | Citizen portal: own record, linked records and access history (complete)                    |
 | Rectification | Correction request workflow (complete)                                                      |
 | Erasure       | Not applicable to a statutory identity register; the PCID allocation is permanent by design |
 | Restriction   | Records can be suspended; per-field restriction is not implemented                          |

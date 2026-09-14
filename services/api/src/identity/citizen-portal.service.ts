@@ -143,6 +143,72 @@ export class CitizenPortalService {
     return { id: row.id };
   }
 
+  async updateEmergencyContact(
+    actor: AuthenticatedActor,
+    contactId: string,
+    input: {
+      fullName: string;
+      relationship: string;
+      phonePrimary: string;
+      phoneSecondary?: string | null;
+      priority: number;
+    },
+    context: RequestContext,
+  ): Promise<{ updated: boolean }> {
+    const { id, pcid } = await this.ownCitizenId(actor);
+    await this.policy.authorize({
+      actor,
+      action: 'CITIZEN_UPDATE',
+      purpose: 'CITIZEN_SELF_SERVICE',
+      resource: {
+        type: 'CITIZEN',
+        id,
+        classification: 'CONFIDENTIAL',
+        subjectPcid: pcid,
+        requestedFields: ['citizen.emergencyContacts'],
+      },
+      context,
+    });
+
+    // Changing a contact resets its verification: the number may now be someone
+    // else's, and a contact nobody has confirmed should not look confirmed.
+    const rows = await this.db.query<{ id: string }>(
+      `UPDATE emergency_contact
+          SET full_name = $3, relationship = $4, phone_primary = $5, phone_secondary = $6,
+              priority = $7, verification_status = 'UNVERIFIED', verified_at = NULL,
+              last_changed_by_type = 'CITIZEN', last_changed_by_id = $8
+        WHERE id = $1 AND citizen_id = $2
+        RETURNING id`,
+      [
+        contactId,
+        id,
+        input.fullName,
+        input.relationship,
+        input.phonePrimary,
+        input.phoneSecondary ?? null,
+        input.priority,
+        actor.subject.userId,
+      ],
+    );
+
+    await this.audit.record({
+      action: 'UPDATE_CITIZEN',
+      outcome: rows.length > 0 ? 'PERMITTED' : 'DENIED',
+      actorType: 'CITIZEN',
+      actorId: actor.subject.userId,
+      actorDisplay: actor.displayName,
+      purpose: 'CITIZEN_SELF_SERVICE',
+      resourceType: 'CITIZEN',
+      resourceId: id,
+      subjectPcid: pcid,
+      fieldsReleased: rows.length > 0 ? ['citizen.emergencyContacts'] : [],
+      correlationId: context.correlationId,
+      ipAddress: context.ipAddress,
+      detail: { change: 'EMERGENCY_CONTACT_UPDATED', contactId },
+    });
+    return { updated: rows.length > 0 };
+  }
+
   async removeEmergencyContact(
     actor: AuthenticatedActor,
     contactId: string,
@@ -205,7 +271,7 @@ export class CitizenPortalService {
         'recorded legal basis, and are visible to the Data Protection Officer.',
       accesses: result.rows.map((row) => ({
         occurredAt: row.occurred_at.toISOString(),
-        agency: row.agency_code,
+        agency: row.agency_name ?? row.agency_code,
         purpose: row.purpose,
         action: row.action,
         reference: row.correlation_id,

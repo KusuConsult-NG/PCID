@@ -21,6 +21,9 @@ import { Citizen360Service } from './identity/citizen360.service';
 import { CitizenPortalController } from './identity/citizen-portal.controller';
 import { CitizenAccountService } from './identity/citizen-account.service';
 import { CitizenPortalService } from './identity/citizen-portal.service';
+import { CitizenSafetyService } from './identity/citizen-safety.service';
+import { CitizenSecurityService } from './identity/citizen-security.service';
+import { CredentialService } from './identity/credential.service';
 import { CitizensController } from './identity/citizens.controller';
 import { CitizensService } from './identity/citizens.service';
 import { ConfigModule } from './config/config.module';
@@ -78,6 +81,9 @@ import { SecurityModule } from './security/security.module';
     Citizen360Service,
     CitizenPortalService,
     CitizenAccountService,
+    CitizenSecurityService,
+    CitizenSafetyService,
+    CredentialService,
     RegistrationService,
     AssetsService,
     IncidentsService,

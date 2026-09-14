@@ -1,0 +1,680 @@
+/*
+ * Plateau Citizen Portal — visual system.
+ *
+ * Written for the people who will actually use it: often on a mid-range phone,
+ * often on a slow connection, sometimes in a hurry and sometimes worried. So:
+ * large type, high contrast, generous targets, and no layout that depends on
+ * JavaScript having arrived.
+ *
+ * Colours are tokens defined once for light, redefined for dark. Contrast has
+ * been checked against WCAG 2.2 AA at every text pairing.
+ */
+
+:root {
+  color-scheme: light;
+
+  --ink: #12171f;
+  --ink-muted: #4a5464;
+  --ink-faint: #6b7585;
+
+  --surface: #ffffff;
+  --surface-sunken: #f4f6f9;
+  --surface-raised: #ffffff;
+  --line: #d5dbe4;
+  --line-strong: #aab4c2;
+
+  /* Plateau State green, darkened until body text on it clears AA. */
+  --brand: #1f6b46;
+  --brand-strong: #175235;
+  --brand-ink: #ffffff;
+  --brand-wash: #eaf4ef;
+
+  --danger: #a4202a;
+  --danger-wash: #fdeced;
+  --warning: #8a5a00;
+  --warning-wash: #fdf3e0;
+  --ok: #1f6b46;
+  --ok-wash: #eaf4ef;
+  --info: #1b4f85;
+  --info-wash: #e9f1fa;
+
+  --focus: #0b5fff;
+
+  --radius: 10px;
+  --radius-lg: 16px;
+  --shadow: 0 1px 2px rgb(18 23 31 / 8%), 0 4px 12px rgb(18 23 31 / 6%);
+
+  --step-0: 1rem;
+  --step-1: 1.125rem;
+  --step-2: 1.375rem;
+  --step-3: 1.75rem;
+  --step-4: 2.25rem;
+}
+
+:root:not([data-theme='light']) {
+  @media (prefers-color-scheme: dark) {
+    color-scheme: dark;
+
+    --ink: #eef2f7;
+    --ink-muted: #b3bdcc;
+    --ink-faint: #8b96a6;
+
+    --surface: #12171f;
+    --surface-sunken: #0c1016;
+    --surface-raised: #1a212b;
+    --line: #2c3644;
+    --line-strong: #44506180;
+
+    --brand: #58c894;
+    --brand-strong: #7fdcaf;
+    --brand-ink: #08170f;
+    --brand-wash: #14261d;
+
+    --danger: #ff9ba3;
+    --danger-wash: #2a1417;
+    --warning: #f0c274;
+    --warning-wash: #2a2113;
+    --ok: #58c894;
+    --ok-wash: #14261d;
+    --info: #8fbdf0;
+    --info-wash: #121e2c;
+
+    --focus: #7fb2ff;
+    --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 12px rgb(0 0 0 / 30%);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font:
+    var(--step-0) / 1.6 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  min-height: 100dvh;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  margin: 0 0 0.5rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: var(--step-4);
+}
+h2 {
+  font-size: var(--step-3);
+}
+h3 {
+  font-size: var(--step-2);
+}
+
+p {
+  margin: 0 0 1rem;
+  max-width: 68ch;
+}
+
+a {
+  color: var(--brand);
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--brand-strong);
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skip link: the first thing in the tab order, invisible until focused. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--surface-raised);
+  color: var(--ink);
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--focus);
+  border-radius: 0 0 var(--radius) 0;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+/* --- Layout -------------------------------------------------------------- */
+
+.masthead {
+  background: var(--brand);
+  color: var(--brand-ink);
+  padding: 0.75rem 0;
+  border-bottom: 4px solid color-mix(in srgb, var(--brand) 70%, black);
+}
+
+.masthead a {
+  color: var(--brand-ink);
+}
+
+.shell {
+  width: min(72rem, 100% - 2rem);
+  margin-inline: auto;
+}
+
+.masthead-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  font-size: var(--step-1);
+  text-decoration: none;
+}
+
+.wordmark-mark {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  background: var(--brand-ink);
+  color: var(--brand);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.masthead-account {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9375rem;
+}
+
+nav.primary {
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+nav.primary ul {
+  display: flex;
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+nav.primary a {
+  display: block;
+  padding: 0.875rem 0.875rem;
+  color: var(--ink-muted);
+  text-decoration: none;
+  font-weight: 550;
+  white-space: nowrap;
+  border-bottom: 3px solid transparent;
+}
+
+nav.primary a:hover {
+  color: var(--ink);
+  background: var(--surface-sunken);
+}
+
+nav.primary a[aria-current='page'] {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+}
+
+main {
+  padding: 2rem 0 4rem;
+}
+
+.page-header {
+  margin-bottom: 1.5rem;
+}
+
+.page-header p {
+  color: var(--ink-muted);
+  font-size: var(--step-1);
+  margin-bottom: 0;
+}
+
+footer.site {
+  border-top: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--ink-muted);
+  padding: 2rem 0;
+  font-size: 0.9375rem;
+}
+
+/* --- Surfaces ------------------------------------------------------------ */
+
+.card {
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+}
+
+.card + .card {
+  margin-top: 1.25rem;
+}
+
+.card-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.card-header h2,
+.card-header h3 {
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+}
+
+.stack > * + * {
+  margin-top: 1rem;
+}
+
+/* --- Definition lists (the shape most of this portal is) ----------------- */
+
+.facts {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) 1fr;
+  gap: 0.6rem 1.25rem;
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--ink-muted);
+  font-size: 0.9375rem;
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 30rem) {
+  .facts {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+  .facts dd {
+    margin-bottom: 0.6rem;
+  }
+}
+
+/* --- Status --------------------------------------------------------------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.badge-ok {
+  background: var(--ok-wash);
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 35%, transparent);
+}
+.badge-warn {
+  background: var(--warning-wash);
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+}
+.badge-danger {
+  background: var(--danger-wash);
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+}
+.badge-info {
+  background: var(--info-wash);
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 35%, transparent);
+}
+.badge-muted {
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+  border-color: var(--line);
+}
+
+.notice {
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--info);
+  background: var(--info-wash);
+  color: var(--ink);
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius);
+}
+
+.notice h3 {
+  font-size: var(--step-1);
+  margin-bottom: 0.35rem;
+}
+
+.notice p:last-child {
+  margin-bottom: 0;
+}
+
+.notice-danger {
+  border-left-color: var(--danger);
+  background: var(--danger-wash);
+}
+.notice-warn {
+  border-left-color: var(--warning);
+  background: var(--warning-wash);
+}
+.notice-ok {
+  border-left-color: var(--ok);
+  background: var(--ok-wash);
+}
+
+/* A card the platform withheld. Shown, never omitted (§29). */
+.restricted {
+  border-style: dashed;
+  background: var(--surface-sunken);
+  box-shadow: none;
+}
+
+.restricted .restricted-body {
+  color: var(--ink-muted);
+}
+
+/* --- Forms ---------------------------------------------------------------- */
+
+.field {
+  display: block;
+  margin-bottom: 1.25rem;
+}
+
+.field > .label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.field > .hint {
+  display: block;
+  color: var(--ink-muted);
+  font-size: 0.9375rem;
+  margin-bottom: 0.45rem;
+}
+
+input[type='text'],
+input[type='password'],
+input[type='tel'],
+input[type='email'],
+input[type='number'],
+select,
+textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.85rem;
+  min-height: 3rem;
+}
+
+textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--focus);
+}
+
+[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.field-error {
+  display: block;
+  color: var(--danger);
+  font-weight: 600;
+  margin-top: 0.35rem;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font: inherit;
+  font-weight: 600;
+  min-height: 3rem;
+  padding: 0.7rem 1.25rem;
+  border-radius: var(--radius);
+  border: 2px solid transparent;
+  background: var(--brand);
+  color: var(--brand-ink);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.button:hover {
+  background: color-mix(in srgb, var(--brand) 85%, black);
+}
+
+.button-secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.button-secondary:hover {
+  background: var(--surface-sunken);
+}
+
+.button-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.button-danger:hover {
+  background: color-mix(in srgb, var(--danger) 85%, black);
+}
+
+.button-quiet {
+  background: transparent;
+  color: var(--brand);
+  border-color: transparent;
+  min-height: 2.5rem;
+  padding: 0.35rem 0.6rem;
+}
+
+.button-quiet:hover {
+  background: var(--brand-wash);
+}
+
+.button[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* --- Tables ---------------------------------------------------------------- */
+
+.table-scroll {
+  overflow-x: auto;
+  margin-inline: -1.5rem;
+  padding-inline: 1.5rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+th {
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* --- The credential ------------------------------------------------------- */
+
+.credential {
+  background: linear-gradient(
+    135deg,
+    var(--brand) 0%,
+    color-mix(in srgb, var(--brand) 60%, #0b3d27) 100%
+  );
+  color: #fff;
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--brand) 60%, black);
+}
+
+.credential .credential-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  opacity: 0.85;
+  margin: 0;
+}
+
+.credential .credential-name {
+  font-size: var(--step-2);
+  font-weight: 700;
+  margin: 0.15rem 0 1rem;
+}
+
+.credential .credential-pcid {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+  font-size: var(--step-2);
+  letter-spacing: 0.06em;
+  margin: 0.15rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.qr-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.qr-frame {
+  background: #fff;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  line-height: 0;
+}
+
+.qr-frame svg {
+  display: block;
+  width: 11rem;
+  height: 11rem;
+}
+
+/* --- Utility --------------------------------------------------------------- */
+
+.muted {
+  color: var(--ink-muted);
+}
+.small {
+  font-size: 0.9375rem;
+}
+.mono {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.center-panel {
+  width: min(30rem, 100%);
+  margin: 3rem auto;
+}
+.empty {
+  color: var(--ink-muted);
+  padding: 1.5rem 0;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

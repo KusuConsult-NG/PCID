@@ -36,6 +36,10 @@ export const ALERT_RULE_KINDS = [
   'INCIDENT_RESPONSE_UNIT_NOTIFICATION',
   'BREAK_GLASS_INITIATED',
   'UNAUTHORISED_ACCESS_ATTEMPT',
+  // Raised by a resident from the citizen portal (§17). Like every other alert,
+  // these describe an event to be reviewed, not a finding about a person.
+  'CITIZEN_REPORTED_IDENTITY_FRAUD',
+  'CITIZEN_REPORTED_UNAUTHORISED_ACCESS',
 ] as const;
 export type AlertRuleKind = (typeof ALERT_RULE_KINDS)[number];
 

@@ -261,6 +261,11 @@ export const ROLE_DEFINITIONS: readonly RoleDefinition[] = Object.freeze([
     description: 'A resident acting on their own record through the citizen portal.',
     actions: [
       'CITIZEN_VIEW',
+      // Scoped to their own record by the self-service gate, and to the fields
+      // the catalogue marks self-service editable.
+      'CITIZEN_UPDATE',
+      'CREDENTIAL_VIEW',
+      'CREDENTIAL_REVOKE',
       'RELATIONSHIP_VIEW',
       'VEHICLE_VIEW',
       'PROPERTY_VIEW',

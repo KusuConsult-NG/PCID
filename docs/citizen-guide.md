@@ -38,6 +38,9 @@ You will also be given credentials for the citizen portal. These are issued in
 person, deliberately: an open sign-up page would let anyone who knows a PCID claim
 somebody's record.
 
+The passphrase you are given at the desk was written down by someone else, so the
+portal will not let you go any further until you have chosen one of your own.
+
 ## What you can do
 
 **See your own record**, including the government records linked to it — property,
@@ -58,6 +61,52 @@ for a tax enquiry, not for a licence application, not to a ministry.
 evidence. It goes to the agency that owns the record.
 
 **Report an emergency**, and **report someone missing**.
+
+## Using the portal
+
+Sign in at the citizen portal with your Plateau Citizen ID — or the email address
+on your record — and your passphrase. Everything below is on one of nine pages:
+
+| Page                   | What it is for                                                                           |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
+| Home                   | Your ID, whether you have emergency contacts, recent access to your record, new messages |
+| My Plateau Citizen ID  | Your ID, a square code to show an officer, and when your ID was last checked             |
+| My records             | What other government offices hold about you, named as theirs                            |
+| Emergency contacts     | The people called if you cannot speak for yourself                                       |
+| Who has seen my record | Every access, with a reference you can quote                                             |
+| Corrections            | Ask for something wrong to be put right                                                  |
+| Messages               | Updates about your record, your requests and anything you reported                       |
+| Report something       | Raise an emergency, report someone missing, report fraud or an access you do not know    |
+| Security               | Change your passphrase, add an authenticator, see where you are signed in                |
+
+### The square code
+
+Your ID page shows a square code an officer can scan. Two things about it are
+worth knowing.
+
+It does not contain your record, or even your Plateau Citizen ID. It contains a
+meaningless short code that only an authenticated government officer can turn
+into an answer — and the answer they get is your name and whether the ID is
+valid, and nothing else. A photograph of the code taken by somebody else is
+useless to them.
+
+It also stops working after about five minutes. Reload the page for a new one.
+That is deliberate, for the same reason: a screenshot of your screen should not
+still work tomorrow.
+
+If your card is lost or stolen, report it on that page. The credential stops
+working immediately, everywhere, and a new one is issued. **Your Plateau Citizen
+ID does not change** — a card can be replaced, an identity cannot.
+
+### Signing in safely
+
+Add an authenticator app under Security. It shows a six-digit code that changes
+every thirty seconds, and it means somebody who learns your passphrase still
+cannot get into your account.
+
+Nobody from the government will ever ask you for your passphrase or for a code
+from your authenticator — not by phone, not by message, not at a counter. If
+someone does, it is not us, and you can report it from the portal.
 
 ## What an emergency responder sees
 
@@ -100,7 +149,11 @@ deleted by anyone.
 
 ## Your access history
 
-The portal shows who looked at your record, when and why.
+The portal shows who looked at your record, when and why — the office by name,
+not a code, with a reference beside each entry. If you do not recognise one, copy
+that reference into "Report something" and it goes to the Data Protection
+Officer. The record of the access you are challenging cannot be altered or
+deleted by anyone, so it will still be there when they look.
 
 One exception: if you are the subject of an active criminal investigation, that
 access is withheld from this list — otherwise telling you would defeat the
@@ -129,7 +182,11 @@ investigation. When that happens:
 
 ## Protecting your account
 
-- Use a long passphrase you have not used anywhere else.
+- Use a long passphrase you have not used anywhere else. A few unrelated words
+  are easier to remember and harder to guess than a short complicated one.
+- Add an authenticator app. It takes about two minutes.
+- Changing your passphrase signs you out everywhere else. If somebody else has
+  been using your account, they lose it at that moment.
 - Keep your emergency contacts current — they matter most at the worst moment.
 - Report a lost card so it can be replaced.
 - If you see an access in your history you cannot account for, report it. It will

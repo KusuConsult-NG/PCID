@@ -25,11 +25,13 @@ supplied one, and is never required to obtain a PCID.
 | Missing persons, unidentified persons, candidate matching     | Complete                                   |
 | Integration framework and linked-record projections           | Complete (sandbox and production adapters) |
 | Public-safety analytics with small-number suppression         | Complete                                   |
-| Web portals, mobile applications, GIS map surface             | Not started — see [Roadmap](#roadmap)      |
+| Citizen portal (`apps/portal`)                                | Complete                                   |
+| Government, security and emergency portals; mobile; GIS map   | Not started — see [Roadmap](#roadmap)      |
 
-The REST API is the whole product surface at this stage. It is documented in
-OpenAPI at `/api/v1/docs`, and `npm run openapi` writes the specification to
-`docs/openapi.json`.
+Two things run: the REST API, documented in OpenAPI at `/api/v1/docs` (and
+written to `docs/openapi.json` by `npm run openapi`), and the citizen portal at
+`apps/portal`, which is a client of that API like any other — it holds no
+database credential and no signing key.
 
 ## The idea in one paragraph
 
@@ -48,6 +50,8 @@ packages/contracts    Shared vocabulary: classifications, purposes, actions,
                       roles, the field catalogue, and the PCID format.
 packages/policy       The authorisation engine. Pure, I/O-free, deny-by-default.
 services/api          The API service: NestJS over PostgreSQL.
+apps/portal           The citizen portal: Next.js, server-rendered, holding the
+                      resident's session so no API token reaches the browser.
 db/migrations         Version-controlled schema migrations.
 docs/                 Architecture, security, privacy, operations and guides.
 ```
@@ -78,18 +82,43 @@ npm run db:bootstrap --workspace services/api
 npm run dev:api        # http://localhost:3000/api/v1/docs
 ```
 
+### A populated environment in one command
+
+With the API running, `npm run db:demo` creates the agencies, officers and one
+resident that make the platform legible, and prints every credential it issued.
+It writes through the same registration, duplicate-detection and audit paths as
+anything else, and refuses to run against a production configuration.
+
+```bash
+npm run db:demo
+```
+
+### The citizen portal
+
+```bash
+# A third key, distinct from the API's two.
+export PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+export PCID_API_URL=http://127.0.0.1:3000
+
+npm run dev:portal     # http://localhost:3100
+```
+
+Sign in with the Plateau Citizen ID and passphrase that `npm run db:demo`
+printed. The portal will ask for a passphrase of your own before it shows you
+anything.
+
 Or bring the whole stack up with Docker:
 
 ```bash
-export TOKEN_SIGNING_KEY=... SECRET_ENCRYPTION_KEY=...
+export TOKEN_SIGNING_KEY=... SECRET_ENCRYPTION_KEY=... PORTAL_SESSION_KEY=...
 docker compose up --build
 ```
 
 ## Verifying the build
 
 ```bash
-npm run verify              # format, lint, typecheck, unit tests
-npm run test:integration    # the full API suite against a real database
+npm run verify              # format, lint, typecheck, unit and integration tests
+npm run test:e2e            # the citizen portal, in a browser, end to end
 ```
 
 `npm run test:integration` compiles with `tsc` and runs against the compiled
@@ -99,6 +128,12 @@ than the one that ships.
 
 The integration suite creates and drops its own databases; point
 `TEST_ADMIN_DATABASE_URL` at a PostgreSQL superuser connection.
+
+`npm run test:e2e` starts an API and a portal of its own, against a database it
+recreates for the run, seeds them with `npm run db:demo`, and drives a real
+browser through a resident's journeys — including an accessibility audit of
+every page against WCAG 2.1 AA. It needs a Chromium build: `npx playwright
+install chromium`.
 
 ## The controls, and where to read them
 
@@ -113,6 +148,8 @@ The integration suite creates and drops its own databases; point
 | The seven §75 propositions             | [`packages/policy/test/critical-authorization.test.ts`](packages/policy/test/critical-authorization.test.ts) |
 | The same, over HTTP                    | [`services/api/test/integration/authorization.test.ts`](services/api/test/integration/authorization.test.ts) |
 | The end-to-end acceptance scenario     | [`services/api/test/integration/acceptance.test.ts`](services/api/test/integration/acceptance.test.ts)       |
+| The portal's own security properties   | [`apps/portal/e2e/security.spec.ts`](apps/portal/e2e/security.spec.ts)                                       |
+| WCAG 2.1 AA on every portal page       | [`apps/portal/e2e/accessibility.spec.ts`](apps/portal/e2e/accessibility.spec.ts)                             |
 
 ## What the platform deliberately cannot do
 
@@ -147,20 +184,21 @@ These are absences by design, and each is held by a test:
 - [Administrator guide](docs/administrator-guide.md)
 - [Security agency guide](docs/security-agency-guide.md)
 - [Emergency response guide](docs/emergency-response-guide.md)
-- [Citizen guide](docs/citizen-guide.md)
+- [Citizen guide](docs/citizen-guide.md) — and the portal a resident uses
 - [Developer guide](docs/developer-guide.md)
 - [Architecture decision records](docs/adr/)
 
 ## Roadmap
 
 Delivered: platform foundation, authentication and authorisation, MDA
-administration, the PCID and citizen registry, the data exchange and integration
-framework, asset registry integration, emergency response, security and case
-management, missing and unidentified persons, and analytics.
+administration, the PCID and citizen registry, the citizen portal, the data
+exchange and integration framework, asset registry integration, emergency
+response, security and case management, missing and unidentified persons, and
+analytics.
 
-Remaining before a pilot: the citizen, government, security and emergency web
-portals; the citizen, field officer and responder mobile applications; the GIS
-command map; the notification delivery workers; load testing; and an independent
+Remaining before a pilot: the government, security and emergency web portals;
+the citizen, field officer and responder mobile applications; the GIS command
+map; the notification delivery workers; load testing; and an independent
 security assessment. [docs/architecture.md](docs/architecture.md#what-is-not-built-yet)
 sets out what each needs.
 

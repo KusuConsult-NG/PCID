@@ -8,7 +8,7 @@ import {
 } from '@pcid/contracts';
 import type { Classification, FieldDefinition } from '@pcid/contracts';
 
-import { SEARCH_ACTIONS } from './action-metadata';
+import { MUTATING_ACTIONS, SEARCH_ACTIONS } from './action-metadata';
 import { effectiveClearance } from './gates';
 import type { AccessApproval, BreakGlassGrant, PolicyRequest, WithheldField } from './types';
 
@@ -140,13 +140,22 @@ export function computeFieldRelease(request: PolicyRequest): FieldReleaseResult 
       continue;
     }
 
-    if (subject.actorType === 'CITIZEN' && definition.selfServiceVisible !== true) {
-      withheldFields.push({
-        field: definition.field,
-        gate: 'FIELD_RELEASE',
-        code: 'FIELD_NOT_SELF_SERVICE_VISIBLE',
-      });
-      continue;
+    if (subject.actorType === 'CITIZEN') {
+      // Reading their own record is bounded by what the catalogue makes visible;
+      // writing to it is bounded by the narrower set it makes editable. A change
+      // to a name or a date of birth goes through the correction workflow, where
+      // it is reviewed against evidence (§52).
+      const citizenRequirement = MUTATING_ACTIONS.has(action)
+        ? { flag: definition.selfServiceEditable, code: 'FIELD_NOT_SELF_SERVICE_EDITABLE' as const }
+        : { flag: definition.selfServiceVisible, code: 'FIELD_NOT_SELF_SERVICE_VISIBLE' as const };
+      if (citizenRequirement.flag !== true) {
+        withheldFields.push({
+          field: definition.field,
+          gate: 'FIELD_RELEASE',
+          code: citizenRequirement.code,
+        });
+        continue;
+      }
     }
 
     if (isEmergencyProfile && !emergencyAllowed.has(definition.field)) {

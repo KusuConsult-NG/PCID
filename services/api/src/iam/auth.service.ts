@@ -174,7 +174,8 @@ export class AuthService {
       AuthenticatableRow & { pcid: string; display_name: string | null }
     >(
       `SELECT ca.id, ca.status, ca.password_hash, ca.password_algorithm, ca.password_params,
-              ca.mfa_enrolled, ca.failed_login_count, ca.locked_until, ca.pcid, c.display_name
+              ca.mfa_enrolled, ca.failed_login_count, ca.locked_until, ca.must_change_password,
+              ca.pcid, c.display_name
          FROM citizen_account ca
          LEFT JOIN citizen c ON c.pcid = ca.pcid
         WHERE lower(ca.email) = lower($1) OR ca.pcid = upper($1)`,
@@ -225,7 +226,7 @@ export class AuthService {
       expiresAt: session.expiresAt.toISOString(),
       authenticationLevel: 'AAL1',
       mfaRequired: row.mfa_enrolled,
-      mustChangePassword: false,
+      mustChangePassword: row.must_change_password === true,
       actor: {
         id: row.id,
         displayName: row.display_name ?? 'Citizen',

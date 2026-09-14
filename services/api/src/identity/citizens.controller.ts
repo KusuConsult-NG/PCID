@@ -9,6 +9,7 @@ import {
   accessReferencesSchema,
   duplicateReviewSchema,
   registrationSchema,
+  verifyCredentialSchema,
   verifySchema,
 } from '../common/dto';
 import { documentRoute } from '../common/openapi/registry';
@@ -18,6 +19,7 @@ import type { AuthenticatedActor } from '../iam/actor';
 import { Citizen360Service } from './citizen360.service';
 import { CitizensService } from './citizens.service';
 import { CitizenAccountService } from './citizen-account.service';
+import { CredentialService } from './credential.service';
 import { RegistrationService } from './registration.service';
 import type { RegistrationInput } from './registration.service';
 
@@ -131,6 +133,15 @@ documentRoute({
 });
 documentRoute({
   method: 'post',
+  path: '/api/v1/verification/credential',
+  tag: 'Verification',
+  summary: 'Verify a scanned PCID credential',
+  description:
+    'Resolves the opaque token a credential QR carries. The token alone authorises nothing: the caller must be an authenticated officer holding the verification action, and the response says only whether the credential is live and the name printed on it. Expired, revoked and already-used codes are reported plainly so the officer knows to ask for a fresh one.',
+  body: verifyCredentialSchema,
+});
+documentRoute({
+  method: 'post',
   path: '/api/v1/citizens',
   tag: 'Citizens',
   summary: 'Register a resident and issue a Plateau Citizen ID',
@@ -170,6 +181,7 @@ export class CitizensController {
     private readonly citizen360: Citizen360Service,
     private readonly registration: RegistrationService,
     private readonly accounts: CitizenAccountService,
+    private readonly credentials: CredentialService,
   ) {}
 
   @Get('citizens')
@@ -270,6 +282,16 @@ export class CitizensController {
   ): Promise<unknown> {
     const input = validate(verifySchema, body);
     return this.citizens.verify(actor, input.pcid, contextOf(request));
+  }
+
+  @Post('verification/credential')
+  async verifyCredential(
+    @Actor() actor: AuthenticatedActor,
+    @Body() body: unknown,
+    @Req() request: Request,
+  ): Promise<unknown> {
+    const input = validate(verifyCredentialSchema, body);
+    return this.credentials.verifyByToken(actor, input.token, contextOf(request));
   }
 
   @Post('citizens')

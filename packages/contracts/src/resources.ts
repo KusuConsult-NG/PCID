@@ -2,6 +2,7 @@
 export const RESOURCE_TYPES = [
   'CITIZEN',
   'EMERGENCY_PROFILE',
+  'CREDENTIAL',
   'VEHICLE',
   'PROPERTY',
   'BUSINESS',

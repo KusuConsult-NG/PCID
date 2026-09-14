@@ -151,6 +151,44 @@ credential. All access is through the API.
   correlation id that ties the client report, the operator log and the audit row
   together without using personal data.
 
+## The citizen portal
+
+The portal is a separate trust boundary and is treated as one. It is a client of
+the API with no database credential, no token-signing key and no entitlement of
+its own; it is authorised exactly as the resident signed into it is, through the
+same policy engine as any other caller.
+
+- **No token in the browser.** The portal renders on the server and holds the
+  resident's access and refresh tokens itself. The browser gets a cookie
+  containing an AES-256-GCM sealed session and nothing else — `HttpOnly`,
+  `SameSite=Strict`, and `Secure` wherever it is deployed. A cross-site scripting bug in the portal therefore
+  does not yield a token, because there is none in the page to take. See
+  [ADR 0005](adr/0005-portal-holds-the-session.md).
+- **CSRF.** Mutations are Server Actions, which are rejected when the
+  submission's origin is not the portal's own; the same-site cookie is the second
+  layer.
+- **A desk-issued passphrase cannot stay in use.** The account is flagged at
+  issue, and every signed-in page redirects to the change-passphrase form until
+  it is replaced. Replacing it ends every other session.
+- **Sign-in reveals nothing.** A wrong passphrase and an identifier that was
+  never issued produce the same message, so the page cannot be used to find out
+  which Plateau Citizen IDs exist.
+- **The QR discloses nothing.** It carries an opaque token that expires in five
+  minutes and that only an authenticated officer holding the verification action
+  can resolve — into a name and a valid/not-valid answer, and nothing else.
+- **Headers.** A restrictive CSP with no third-party origin at all,
+  `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `Referrer-Policy:
+no-referrer`, `nosniff`, geolocation permitted only to the page itself, and
+  `noindex` on every page.
+- **Location is opt-in and provenance travels with it.** The only coordinate the
+  portal can send is one a resident explicitly chose to share when raising an
+  emergency, and it is stored marked `CALLER_SUPPLIED` with a retention date
+  (§16).
+
+`apps/portal/e2e/security.spec.ts` asserts the properties above against the
+running build — including that no JWS and no bearer header appears in the HTML of
+any page, and that every signed-in route is unreachable without a session.
+
 ## Verified by tests
 
 [`services/api/test/integration/security.test.ts`](../services/api/test/integration/security.test.ts)
@@ -165,6 +203,10 @@ self-administration, and error-message leakage.
 [`packages/policy/test/critical-authorization.test.ts`](../packages/policy/test/critical-authorization.test.ts)
 and [`services/api/test/integration/authorization.test.ts`](../services/api/test/integration/authorization.test.ts)
 prove the seven propositions of §75 at the engine and at the HTTP boundary.
+
+[`apps/portal/e2e/security.spec.ts`](../apps/portal/e2e/security.spec.ts) does the
+same for the portal in a real browser, against the standalone build the container
+runs.
 
 ## Not covered yet
 
@@ -186,6 +228,8 @@ Stated plainly, because a security document that only lists strengths is not one
   behavioural detection §32 envisages is configured but not implemented.
 - **Secrets management** is assumed to be provided by the deployment platform;
   this repository defines the interface and never carries a secret.
+- **Portal session-key rotation** signs every resident out. The ciphertext format
+  carries a version, so a two-key window is possible; it is not implemented.
 
 ## Reporting a vulnerability
 

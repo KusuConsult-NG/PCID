@@ -239,6 +239,9 @@ export class CitizensService {
         requestedFields: ['citizen.displayName', 'citizen.status', 'citizen.verificationLevel'],
       },
       context,
+      // Recorded so the resident's own history can say how their identity was
+      // checked, rather than leaving it to be inferred.
+      auditDetail: { method: 'TYPED_PCID' },
     });
 
     if (row === null || row.status === 'MERGED') {

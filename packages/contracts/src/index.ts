@@ -5,6 +5,7 @@ export * from './audit';
 export * from './authorization';
 export * from './cases';
 export * from './classification';
+export * from './credential';
 export * from './emergency';
 export * from './errors';
 export * from './field-catalogue';

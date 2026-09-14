@@ -77,6 +77,11 @@ export function resolveCitizenVisibility(event: {
   };
 }
 
+/** An access as a resident sees it: the office's name, not its code. */
+export interface CitizenAccessRow extends AuditEventRow {
+  agency_name: string | null;
+}
+
 export interface AuditEventRow {
   seq: string;
   id: string;
@@ -226,19 +231,28 @@ export class AuditService {
    * The citizen's own access history (§26). Only events marked visible are
    * returned; a restricted event is not listed and its existence is not implied.
    */
+  /**
+   * What a resident is entitled to see about who opened their record (§26).
+   *
+   * The agency's name is joined in rather than taken from the event's own
+   * `agency_code`: the code is the right thing to keep in an immutable record,
+   * but "PLT-REVENUE" does not tell anyone who looked at their file. The code
+   * stands in only if that agency no longer exists.
+   */
   async citizenAccessHistory(
     pcid: string,
     options: { limit: number; offset: number },
-  ): Promise<{ rows: AuditEventRow[]; total: number }> {
-    const rows = await this.db.query<AuditEventRow>(
-      `SELECT seq, id, occurred_at, action, outcome, actor_type, actor_display,
-              agency_id, agency_code, purpose, resource_type, citizen_visibility,
-              correlation_id
-         FROM audit_event
-        WHERE subject_pcid = $1
-          AND citizen_visibility = 'ACCESS_VISIBLE_TO_CITIZEN'
-          AND outcome = 'PERMITTED'
-        ORDER BY occurred_at DESC
+  ): Promise<{ rows: CitizenAccessRow[]; total: number }> {
+    const rows = await this.db.query<CitizenAccessRow>(
+      `SELECT e.seq, e.id, e.occurred_at, e.action, e.outcome, e.actor_type, e.actor_display,
+              e.agency_id, e.agency_code, a.name AS agency_name, e.purpose, e.resource_type,
+              e.citizen_visibility, e.correlation_id
+         FROM audit_event e
+         LEFT JOIN agency a ON a.id = e.agency_id
+        WHERE e.subject_pcid = $1
+          AND e.citizen_visibility = 'ACCESS_VISIBLE_TO_CITIZEN'
+          AND e.outcome = 'PERMITTED'
+        ORDER BY e.occurred_at DESC
         LIMIT $2 OFFSET $3`,
       [pcid, options.limit, options.offset],
     );

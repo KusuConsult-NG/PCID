@@ -8,6 +8,14 @@ export default tseslint.config(
       '**/dist-test/**',
       '**/node_modules/**',
       '**/coverage/**',
+      // Next's build output and the generated ambient declarations that come
+      // with it: neither is written here, so neither is linted here.
+      '**/.next/**',
+      'apps/portal/next-env.d.ts',
+      // End-to-end run artefacts: traces, screenshots and the provisioned
+      // credentials for a database that no longer exists.
+      'apps/portal/e2e/.artefacts/**',
+      'apps/portal/e2e/.results/**',
       'docs/openapi.json',
     ],
   },

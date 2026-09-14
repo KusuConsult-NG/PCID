@@ -79,6 +79,56 @@ jobs:
           name: openapi
           path: docs/openapi.json
 
+  portal:
+    name: Citizen portal end-to-end and accessibility tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      TEST_ADMIN_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Pinned with the toolchain: the suite drives the browser revision that
+      # this Playwright release expects.
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+
+      # Starts its own API and portal against a database it creates, so nothing
+      # here needs to be wired up by hand.
+      - name: End-to-end and accessibility tests
+        run: npm run test:e2e
+
+      - name: Upload the failure trace
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-trace
+          path: apps/portal/e2e/.results/
+          retention-days: 7
+
   container:
     name: Container image builds
     runs-on: ubuntu-latest
@@ -86,7 +136,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Build the runtime image
+      - name: Build the API image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -94,3 +144,9 @@ jobs:
           # A production image must not be able to load the sandbox adapters.
           build-args: |
             NODE_ENV=production
+      - name: Build the citizen portal image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/portal/Dockerfile
+          push: false

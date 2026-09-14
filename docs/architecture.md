@@ -15,21 +15,21 @@ and there is exactly one component that decides it.
 ## Components
 
 ```
-                    ┌─────────────────────────────────────────┐
-   Portals,         │            services/api                  │
-   MDA systems ───► │                                          │
-   Mobile apps      │  Guard ─► Controller ─► PolicyService ───┼──► @pcid/policy
-                    │             │              │             │    (pure, no I/O)
-                    │             │              ▼             │
-                    │             │        AuditService ───────┼──► audit_event
-                    │             ▼                            │    (hash chained)
-                    │         Domain service ──────────────────┼──► PostgreSQL
-                    └─────────────────────────────────────────┘
-                                        ▲
-                                        │ projections only, never write-back
-                                 Integration adapters
-                                        ▲
-                                  Agency systems
+  Resident's                                ┌────────────────────────────────────────┐
+  browser  ──►  apps/portal  ─────────────► │            services/api                │
+                (server-rendered;           │                                        │
+                 holds the session,         │  Guard ─► Controller ─► PolicyService ─┼─► @pcid/policy
+                 no token in the browser)   │            │              │            │   (pure, no I/O)
+                                            │            │              ▼            │
+  MDA systems  ─────────────────────────►   │            │        AuditService ──────┼─► audit_event
+  Mobile apps  ─────────────────────────►   │            ▼                           │   (hash chained)
+                                            │        Domain service ─────────────────┼─► PostgreSQL
+                                            └────────────────────────────────────────┘
+                                                              ▲
+                                                              │ projections only,
+                                                       Integration adapters   never write-back
+                                                              ▲
+                                                        Agency systems
 ```
 
 ### `packages/contracts` — the vocabulary
@@ -101,6 +101,29 @@ a review, counting a break-glass use.
 Writing the audit record first is deliberate: a failure to record an access fails
 the request. The platform would rather refuse a lookup than perform one it cannot
 account for.
+
+### `apps/portal` — what a resident sees
+
+A Next.js application rendered entirely on the server. It is a client of the API
+like any MDA system: it holds no database credential, no signing key and no
+entitlement of its own. What it holds is the session of the person currently
+signed in — the access and refresh tokens, sealed with AES-256-GCM into an
+http-only, same-site cookie that the browser cannot read and cannot replay
+anywhere else.
+
+That shape is the point. If the browser held a token, every cross-site scripting
+bug in a state identity portal would be a token theft. Here there is nothing in
+the page to steal: the tokens never leave the server, and an end-to-end test
+asserts it on every page.
+
+The portal renders what the API released and says so where it did not. A card the
+policy engine withheld is shown as "Restricted information" rather than omitted,
+because an absent card and an absent record must not look the same (§29).
+
+Everything works without JavaScript. Forms are Server Actions, navigation is
+links, and the single client component is a submit button that dims while a form
+is in flight. A resident on a cheap phone on a bad connection is the normal case,
+not the edge case.
 
 ## Decisions worth explaining
 
@@ -227,11 +250,12 @@ local state, so a move to Kubernetes is a deployment change rather than a redesi
 
 ## What is not built yet
 
-The API is the whole surface today. Still to build:
+The API and the citizen portal are the surface today. Still to build:
 
-- **Web portals** for citizens, government users, security agencies and emergency
-  services. The API returns everything they need, including which cards are
-  restricted and why, so the interface can say "Restricted information" honestly.
+- **Web portals** for government users, security agencies and emergency services.
+  The API returns everything they need, including which cards are restricted and
+  why, so each interface can say "Restricted information" honestly — which is
+  what the citizen portal already does.
 - **Mobile applications** for citizens, field officers and responders, including
   the controlled offline mode described in §56 — encrypted, expiring,
   device-bound, minimal, revocable, and never a copy of the registry.

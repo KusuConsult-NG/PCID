@@ -826,6 +826,61 @@ export const UNIDENTIFIED_PERSON_FIELDS: readonly FieldDefinition[] = Object.fre
   },
 ]);
 
+export const CREDENTIAL_FIELDS: readonly FieldDefinition[] = Object.freeze([
+  {
+    field: 'credential.serial',
+    resourceType: 'CREDENTIAL',
+    classification: 'INTERNAL',
+    purposes: ['CITIZEN_SELF_SERVICE', 'IDENTITY_VERIFICATION'],
+    selfServiceVisible: true,
+    description: 'Serial number printed on the credential, distinct from the PCID itself.',
+  },
+  {
+    field: 'credential.format',
+    resourceType: 'CREDENTIAL',
+    classification: 'INTERNAL',
+    purposes: ['CITIZEN_SELF_SERVICE', 'IDENTITY_VERIFICATION'],
+    selfServiceVisible: true,
+    description: 'Whether this is the digital credential or a printed card.',
+  },
+  {
+    field: 'credential.status',
+    resourceType: 'CREDENTIAL',
+    classification: 'INTERNAL',
+    purposes: ['CITIZEN_SELF_SERVICE', 'IDENTITY_VERIFICATION'],
+    selfServiceVisible: true,
+    // The resident changes this by reporting the credential lost, which is the
+    // one change to it they can make themselves.
+    selfServiceEditable: true,
+    description: 'Whether the credential is active, suspended, revoked, replaced or expired.',
+  },
+  {
+    field: 'credential.issuedAt',
+    resourceType: 'CREDENTIAL',
+    classification: 'INTERNAL',
+    purposes: ['CITIZEN_SELF_SERVICE', 'IDENTITY_VERIFICATION'],
+    selfServiceVisible: true,
+    description: 'When the credential was issued.',
+  },
+  {
+    field: 'credential.expiresAt',
+    resourceType: 'CREDENTIAL',
+    classification: 'INTERNAL',
+    purposes: ['CITIZEN_SELF_SERVICE', 'IDENTITY_VERIFICATION'],
+    selfServiceVisible: true,
+    description: 'When the credential expires and must be replaced.',
+  },
+  {
+    field: 'credential.verificationUrl',
+    resourceType: 'CREDENTIAL',
+    classification: 'CONFIDENTIAL',
+    purposes: ['CITIZEN_SELF_SERVICE'],
+    selfServiceVisible: true,
+    description:
+      'The URL the credential QR encodes. An opaque, short-lived token and nothing else, released only to the holder.',
+  },
+]);
+
 export const FIELD_CATALOGUE: readonly FieldDefinition[] = Object.freeze([
   ...CITIZEN_FIELDS,
   ...VEHICLE_FIELDS,
@@ -835,6 +890,7 @@ export const FIELD_CATALOGUE: readonly FieldDefinition[] = Object.freeze([
   ...LICENCE_FIELDS,
   ...MISSING_PERSON_FIELDS,
   ...UNIDENTIFIED_PERSON_FIELDS,
+  ...CREDENTIAL_FIELDS,
 ]);
 
 const BY_FIELD: ReadonlyMap<string, FieldDefinition> = new Map(

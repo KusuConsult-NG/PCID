@@ -16,12 +16,31 @@ createdb pcid && npm run db:migrate && npm run db:seed
 npm run dev:api
 ```
 
+With the API up, `npm run db:demo` creates agencies, officers and a resident and
+prints every credential it issued, so there is something to look at within a
+minute. It goes through the same registration, duplicate-detection and audit
+paths as anything else, and refuses to run against a production configuration.
+
+The portal is a second process:
+
+```bash
+export PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+export PCID_API_URL=http://127.0.0.1:3000
+npm run dev:portal     # http://localhost:3100
+```
+
+The seed and the API must share `SECRET_ENCRYPTION_KEY`: authenticator secrets
+are stored under an envelope, and a seed written with one key is unreadable to a
+service holding another.
+
 ## Layout, and the dependency rule
 
 ```
 packages/contracts   Vocabulary. Depends on nothing.
 packages/policy      The engine. Depends on contracts only. No I/O.
 services/api         Everything else. Depends on both.
+apps/portal          The citizen portal. Depends on the API over HTTP and on
+                     nothing in this repository - not even the contracts.
 ```
 
 The rule is one-directional and worth protecting: `@pcid/policy` must never import
@@ -33,8 +52,13 @@ exhaustively without a database, and a single import would end that.
 ```bash
 npm run test:unit                                    # contracts, policy, security primitives
 npm run test:integration --workspace services/api    # the API against a real database
-npm run verify                                       # format, lint, typecheck, unit
+npm run test:e2e                                     # the portal, in a real browser
+npm run verify                                       # format, lint, typecheck, unit + integration
 ```
+
+`verify` deliberately leaves the end-to-end suite out: it needs a browser, and it
+is its own job in CI so a portal failure and a platform failure are told apart at
+a glance.
 
 Integration tests compile with `tsc` and run against the compiled output, because
 esbuild-based loaders do not emit decorator metadata and Nest's dependency
@@ -43,6 +67,29 @@ application that actually ships.
 
 Each integration suite creates and drops its own database, so they are isolated
 and can be run repeatedly.
+
+### The end-to-end suite
+
+`npm run test:e2e` needs nothing running. It builds the API, recreates a database
+of its own, starts the service on port 3400 and the portal's standalone build on
+3401, seeds them with `npm run db:demo -- --json`, and drives Chromium through a
+resident's journeys — then audits every page against WCAG 2.1 AA with axe.
+
+It runs in three ordered projects. `provision` signs the resident in for the first
+time and makes them choose a passphrase, which is both the first journey and how
+the other projects get a session. `portal` is the journeys and the portal's
+security properties. `accessibility` runs last, so the pages it audits hold the
+records the journeys created — an empty table hides most of the mistakes a
+populated one makes.
+
+Chromium has to be present: `npx playwright install chromium`. Playwright is
+pinned exactly, because a minor bump expects a different browser revision than the
+CI image carries.
+
+Two things are deliberate and worth not "fixing". Nothing is stubbed, so a failure
+usually means the platform refused something rather than that a selector moved.
+And the portal is built and run the way the container runs it — the standalone
+server, not `next start` — so the suite exercises the artefact that ships.
 
 ### The TOTP wrinkle
 
@@ -198,9 +245,32 @@ signed agreement; is the authenticator confirmed; does a role grant the action; 
 the purpose one that action allows; is the field catalogued for that purpose; is
 there a case or incident and is the account on it.
 
+## Working on the portal
+
+The portal renders on the server and holds the session; see
+[ADR 0005](adr/0005-portal-holds-the-session.md) for why. Three rules follow from
+that and are worth keeping:
+
+- **No API token reaches the browser.** Call the API from a Server Component or a
+  Server Action, never from a client component. `apps/portal/e2e/security.spec.ts`
+  asserts this on every page and will catch a regression.
+- **Render what the API released, and say so where it did not.** A card the
+  policy engine withheld is shown with `<Restricted>`, not omitted: an absent card
+  and an absent record must not look the same (§29).
+- **It has to work without JavaScript.** Forms are Server Actions and navigation
+  is links. Reach for a client component only when there is no other way, as with
+  the opt-in location control on the report page.
+
+Where a page shows the same field in more than one form, give each control its own
+`id` (`<Field name="fullName" id={...} />`). The name is what the action receives;
+the id is what the label points at, and two labels pointing at the same id is an
+accessibility failure the axe suite will fail on.
+
 ## Pull requests
 
 - `npm run verify` and the integration suite pass.
+- A change to the portal passes `npm run test:e2e`, including the accessibility
+  audit.
 - Any authorisation change has a test that fails without it.
 - Any new field has a catalogue entry and a release test.
 - Migrations are new files, never edits.
