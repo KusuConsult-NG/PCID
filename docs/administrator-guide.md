@@ -136,6 +136,28 @@ are better than one broad one.
 | `DATA_PROTECTION_OFFICER` | Oversight, correction review, access transparency                       |
 | `SECURITY_ADMINISTRATOR`  | User administration within one security agency                          |
 
+Break-glass initiation sits with `INCIDENT_OFFICER` and `EMERGENCY_RESPONDER`
+only. It is not held by any investigative role, so an investigator who needs it
+asks somebody who has it; the security agency portal says so on the page rather
+than showing them an empty space.
+
+### Which portal an account signs into
+
+A role decides what an account can do; it does not decide which application the
+person opens. There are three, and an account signs into whichever one matches
+its work:
+
+| Portal            | Port | For                                              |
+| ----------------- | ---- | ------------------------------------------------ |
+| `apps/portal`     | 3100 | Residents, their own record only                 |
+| `apps/government` | 3200 | Registration desks, service counters, oversight  |
+| `apps/security`   | 3300 | Investigators, supervisors, missing-person desks |
+
+Each seals its session with a key of its own and has its own idle timeout — the
+security portal's is the shortest at ten minutes. An officer holding roles that
+span two of them signs into each separately; there is no shared session, by
+design.
+
 ### Jurisdiction and access windows
 
 A jurisdiction of `LGA` or `WARD` confines the account geographically; records

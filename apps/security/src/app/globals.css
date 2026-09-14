@@ -1,0 +1,171 @@
+/*
+ * The security agency portal's stylesheet.
+ *
+ * The design system is the shared one: three applications, one government. What
+ * is here is what must differ.
+ *
+ * The masthead is a deep maroon - green for residents, blue for government
+ * counters, maroon here. That is not decoration. Somebody glancing at a screen
+ * in a command room should know at once which application is open, because a
+ * counter clerk delivering a service and an officer running a criminal
+ * investigation reach the same register through very different doors.
+ */
+@import '@pcid/portal-kit/styles.css';
+
+:root {
+  --sec: #5c1f2b;
+  --sec-strong: #3f141d;
+  --sec-wash: #f4ebed;
+}
+
+:root:not([data-theme='light']) {
+  @media (prefers-color-scheme: dark) {
+    --sec: #3f141d;
+    --sec-wash: #241a1d;
+  }
+}
+
+.masthead-security {
+  background: var(--sec);
+  border-bottom-color: var(--sec-strong);
+}
+
+/* The case and purpose an officer is working under, shown wherever a record is. */
+.purpose-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--sec);
+  border-radius: var(--radius);
+  background: var(--sec-wash);
+  margin-bottom: 1.25rem;
+}
+
+.purpose-banner strong {
+  font-weight: 700;
+}
+
+/* Two people side by side, for comparing a candidate against an enquiry. */
+.comparison {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.comparison .facts dd.differs {
+  background: var(--warning-wash);
+  border-radius: 4px;
+  padding-inline: 0.3rem;
+  font-weight: 600;
+}
+
+.score {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--step-2);
+  font-weight: 700;
+}
+
+/* A queue count on the home page. */
+.queue-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.queue-count {
+  font-size: var(--step-4);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.entitlements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+/* A candidate match: a score and the reasoning that produced it, never a verdict. */
+.candidate {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--warning);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.candidate .score {
+  color: var(--warning);
+}
+
+.factors {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+}
+
+/* The case file's running notes. */
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.timeline li {
+  border-left: 3px solid var(--line-strong);
+  padding: 0.1rem 0 0.1rem 0.9rem;
+}
+
+.timeline .muted {
+  display: block;
+}
+
+/*
+ * A closed list of things to tick: which fields to ask for, which check
+ * break-glass is standing in for.
+ *
+ * A fieldset with a legend, so a screen reader announces the question before
+ * the first option rather than leaving ten unrelated checkboxes in a row. The
+ * target is the whole row, not the 13px square.
+ */
+.choices {
+  border: 0;
+  padding: 0;
+  margin: 0 0 1.25rem;
+}
+
+.choices > legend {
+  padding: 0;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.choice {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.45rem 0.6rem;
+  border-radius: 4px;
+  font-weight: 400;
+}
+
+.choice:hover {
+  background: var(--sec-wash);
+}
+
+.choice input[type='checkbox'] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.15rem;
+  flex: none;
+}
+
+.choice .hint {
+  font-weight: 400;
+}

@@ -120,5 +120,29 @@ services:
     security_opt: ['no-new-privileges:true']
     cap_drop: ['ALL']
 
+  security-portal:
+    build:
+      context: .
+      dockerfile: apps/security/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3300
+      PCID_API_URL: http://api:3000
+      # A fifth key. Each portal seals its own session cookie, so a compromise of
+      # one does not produce a usable cookie for any other.
+      SECURITY_PORTAL_SESSION_KEY: ${SECURITY_PORTAL_SESSION_KEY:?set SECURITY_PORTAL_SESSION_KEY}
+      # The shortest of the three. What is reachable from here is case-bound
+      # access to the register under a criminal-investigation purpose, on a
+      # machine in a command room somebody else can walk into.
+      SECURITY_PORTAL_SESSION_TTL_SECONDS: 600
+      SECURITY_PORTAL_ALLOWED_ORIGINS: http://localhost:3300
+    ports: ['3300:3300']
+    depends_on:
+      api: { condition: service_started }
+    read_only: true
+    tmpfs: ['/tmp']
+    security_opt: ['no-new-privileges:true']
+    cap_drop: ['ALL']
+
 volumes:
   postgres-data:

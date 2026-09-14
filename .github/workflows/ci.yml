@@ -87,6 +87,7 @@ jobs:
         portal:
           - { name: Citizen, workspace: '@pcid/portal' }
           - { name: Government, workspace: '@pcid/government-portal' }
+          - { name: Security, workspace: '@pcid/security-portal' }
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -161,4 +162,10 @@ jobs:
         with:
           context: .
           file: apps/government/Dockerfile
+          push: false
+      - name: Build the security agency portal image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/security/Dockerfile
           push: false

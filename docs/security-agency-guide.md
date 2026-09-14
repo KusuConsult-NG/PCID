@@ -2,6 +2,26 @@
 
 For investigators, supervisors and security agency administrators.
 
+## The portal
+
+`apps/security` is this guide made into an interface, at
+`http://localhost:3300` in development. It is not a thin wrapper over the API:
+where the two differ, prefer the portal, because it is where the awkward paths
+have been worked out.
+
+Sign in with your work email address and the six-digit code from your
+authenticator. If an administrator chose your passphrase, you will be made to
+replace it before anything opens — until you do, two people know it.
+
+The navigation is built from the entitlements your account actually holds, read
+from the same list the policy engine reads. An investigator, a supervisor and a
+missing-person desk in the same command see three different applications, and
+each sees only what it can use.
+
+Everything below is reachable from it. The HTTP is shown because integrators and
+mobile clients need it, and because it is the honest description of what the
+portal does on your behalf.
+
 ## The rule that shapes everything else
 
 **Your authority comes from the case, not from your rank.** Being an investigator
@@ -55,6 +75,39 @@ GET /api/v1/citizens/PL-4K7T9-QM2XB-7H?purpose=CRIMINAL_INVESTIGATION&caseRef=CA
 
 `restrictedFields` names what was withheld. Some fields need a supervisor's
 approval; asking is the route, not working around it.
+
+## Closing a case, and what closing costs
+
+A closed case authorises no access — and that includes the case file itself.
+Once closed, nobody can read it back through the platform: not you, not the
+officer you took it from, not your supervisor. Nothing is deleted; what was done
+on the case, by whom, and under what stated reason is on the audit record, which
+is where an oversight review reads it.
+
+So close a case when the work is finished, not to tidy the list.
+
+The same holds for `SUSPENDED`, which is why the portal does not offer it:
+a suspended case authorises no access either, and changing a case is itself
+case-bound, so an officer who suspended one would have no way to set it back.
+
+## Taking a case on
+
+Reading a case file requires an assignment on that case. Creating the assignment
+deliberately does not — otherwise a case would become unjoinable the moment the
+officer holding it left the service.
+
+```http
+POST /api/v1/cases/CASE-2026-00928/assignments
+{ "userId": "…", "role": "SUPERVISOR" }
+```
+
+The case must belong to your agency, it must be active, and it must not be
+classified above your clearance. A refusal says nothing about whether the case
+exists: an assignment onto a case number that was never issued is refused in the
+same words as one onto a case that is real.
+
+In the portal this is the **Take a case on** form at the bottom of the case
+list, which is the one place an officer can act on a case they cannot yet read.
 
 ## Requesting a restricted field
 
@@ -123,6 +176,14 @@ supervisor with the factors in front of you.
 For the case the model cannot anticipate: a person is in front of you, the
 authority you need does not exist yet, and waiting causes harm.
 
+**Which roles hold it.** `BREAK_GLASS_INITIATE` is granted to the
+emergency-response roles — `INCIDENT_OFFICER` and `EMERGENCY_RESPONDER` — and not
+to `INVESTIGATOR`, `SUPERVISOR` or `MISSING_PERSON_OFFICER`. If you hold only an
+investigative role, the portal tells you so on the authorisation page rather
+than leaving a blank space you might read as "the platform cannot do this": you
+telephone your supervisor or the control room, and an officer who holds it
+breaks the glass and answers for it afterwards.
+
 ```http
 POST /api/v1/break-glass
 {
@@ -161,7 +222,10 @@ Your daily work on this platform:
   control.
 - **Case assignment** — you can take on a case in your own agency without being
   assigned first, because managing your caseload is administration and releases
-  nothing. Data access still requires the assignment.
+  nothing. Data access still requires the assignment. In the portal, the form is
+  on the case list rather than inside the file you cannot yet open.
+- **Case closure** — yours alone, and it demands a note saying how the case
+  ended. Read **Closing a case, and what closing costs** first: it is one-way.
 - **Match confirmation** — the decision the system will not make.
 
 ## What your agency cannot do

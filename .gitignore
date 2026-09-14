@@ -15,8 +15,6 @@ tmp/
 *.log
 docs/openapi.json
 dist-test/
-apps/portal/e2e/.artefacts/
-apps/portal/e2e/.results/
 playwright-report/
-apps/government/e2e/.artefacts/
-apps/government/e2e/.results/
+apps/*/e2e/.artefacts/
+apps/*/e2e/.results/

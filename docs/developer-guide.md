@@ -21,12 +21,17 @@ prints every credential it issued, so there is something to look at within a
 minute. It goes through the same registration, duplicate-detection and audit
 paths as anything else, and refuses to run against a production configuration.
 
-The portal is a second process:
+The portals are separate processes, one key each:
 
 ```bash
-export PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
 export PCID_API_URL=http://127.0.0.1:3000
-npm run dev:portal     # http://localhost:3100
+export PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+export GOVERNMENT_PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+export SECURITY_PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+
+npm run dev:portal       # http://localhost:3100
+npm run dev:government   # http://localhost:3200
+npm run dev:security     # http://localhost:3300
 ```
 
 The seed and the API must share `SECRET_ENCRYPTION_KEY`: authenticator secrets
@@ -44,6 +49,7 @@ services/api         Everything else. Depends on contracts and policy.
 apps/portal          The citizen portal. Depends on portal-kit and on the API
                      over HTTP; on nothing else in this repository.
 apps/government      The government portal. The same.
+apps/security        The security agency portal. The same.
 ```
 
 The rule is one-directional and worth protecting: `@pcid/policy` must never import
@@ -73,21 +79,24 @@ and can be run repeatedly.
 
 ### The end-to-end suite
 
-`npm run test:e2e` runs both suites and needs nothing running. Each builds the
-API, recreates a database of its own, starts the service and the portal's
+`npm run test:e2e` runs all three suites and needs nothing running. Each builds
+the API, recreates a database of its own, starts the service and the portal's
 standalone build on ports of its own (3400/3401 for the citizen portal,
-3402/3403 for the government one), seeds them with `npm run db:demo -- --json`,
-and drives Chromium through the journeys — then audits every page against WCAG
-2.1 AA with axe.
+3402/3403 for the government one, 3404/3405 for the security agency one), seeds
+them with `npm run db:demo -- --json`, and drives Chromium through the journeys —
+then audits every page against WCAG 2.1 AA with axe.
 
-Both run in ordered projects, and `provision` is always the first: it signs each
-account in for the first time and makes it choose a passphrase, which is both the
-first journey and how the other projects get a session. The government suite
-then runs `registration`, `counter` and `oversight` as three _different_
-officers, which is the point — an entitlement test that runs as one account
-proves very little. `accessibility` runs last in both, so the pages it audits
-hold the records the journeys created: an empty table hides most of the mistakes
-a populated one makes.
+All three run in ordered projects, and `provision` is always the first: it signs
+each account in for the first time and makes it choose a passphrase, which is
+both the first journey and how the other projects get a session. The government
+suite then runs `registration`, `counter` and `oversight` as three _different_
+officers, and the security suite runs `investigation`, `missing-persons` and
+`supervision` as three different officers of _one_ agency — which is the point.
+An entitlement test that runs as one account proves very little, and the claim
+the security portal has to make is that being in the Police Command is not the
+same as being on the case. `accessibility` runs last in all three, so the pages
+it audits hold the records the journeys created: an empty table hides most of the
+mistakes a populated one makes.
 
 Chromium has to be present: `npx playwright install chromium`. Playwright is
 pinned exactly, because a minor bump expects a different browser revision than the
@@ -254,8 +263,8 @@ there a case or incident and is the account on it.
 
 ## Working on a portal
 
-Both portals render on the server and hold the session; see
-[ADR 0005](adr/0005-portal-holds-the-session.md) for why. Three rules follow from
+All three portals render on the server and hold the session; see
+[ADR 0005](adr/0005-portal-holds-the-session.md) for why. Four rules follow from
 that and are worth keeping:
 
 - **No API token reaches the browser.** Call the API from a Server Component or a
@@ -271,6 +280,11 @@ that and are worth keeping:
   does not: "Viewed your record" and "Opened a citizen record" are one audit row
   described to two audiences, and a shared label would be wrong for one of them.
   Each portal keeps its own `src/lib/vocabulary.ts`.
+- **Do not offer a button the platform would refuse, and do not leave a silence
+  where one used to be.** Gate on the account's resolved actions from
+  `/auth/me`; where the absence is itself worth knowing — break glass, which no
+  investigative role holds — say so on the page. An officer who finds nothing
+  concludes the platform cannot do it, and then does something worse.
 
 Where a page shows the same field in more than one form, give each control its own
 `id` (`<Field name="fullName" id={...} />`). The name is what the action receives;
@@ -280,7 +294,7 @@ accessibility failure the axe suite will fail on.
 ## Pull requests
 
 - `npm run verify` and the integration suite pass.
-- A change to either portal passes `npm run test:e2e`, including the
+- A change to any portal passes `npm run test:e2e`, including the
   accessibility audit.
 - A new action is performed by a documented route, or is listed in
   `AWAITING_A_SURFACE` with the surface that will perform it named.

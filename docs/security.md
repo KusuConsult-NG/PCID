@@ -178,14 +178,19 @@ reads and asserts the chain is still intact.
 
 ## The portals
 
-Each portal is a separate trust boundary and is treated as one. Both are clients
-of the API with no database credential, no token-signing key and no entitlement
-of their own; each is authorised exactly as the person signed into it is,
-through the same policy engine as any other caller. They seal their sessions
-with different keys, so a compromise of one does not produce a usable cookie for
-the other.
+Each portal is a separate trust boundary and is treated as one. All three are
+clients of the API with no database credential, no token-signing key and no
+entitlement of their own; each is authorised exactly as the person signed into
+it is, through the same policy engine as any other caller. They seal their
+sessions with different keys, so a compromise of one does not produce a usable
+cookie for another.
 
-The controls below hold for both.
+Their idle timeouts differ, and the differences are deliberate: thirty minutes
+for a resident on their own phone, fifteen for an officer at a shared counter,
+ten for the security agency portal, whose reach is case-bound access to the
+register on a machine in a command room somebody else can walk into.
+
+The controls below hold for all three.
 
 - **No token in the browser.** The portal renders on the server and holds the
   resident's access and refresh tokens itself. The browser gets a cookie
@@ -205,9 +210,10 @@ The controls below hold for both.
   also knew.
 - **Step-up is handled, not worked around.** An operation that changes the
   register or somebody's access to it requires a session re-proved minutes ago,
-  not one proved this morning and left open on a counter. The government portal
-  sends the officer to re-authenticate and returns them to the task, and the
-  return address is refused unless it is a path within the application.
+  not one proved this morning and left open on a counter. The government and
+  security portals send the officer to re-authenticate and return them to the
+  task, and the return address is refused unless it is a path within the
+  application.
 - **Sign-in reveals nothing.** A wrong passphrase and an identifier that was
   never issued produce the same message, so the page cannot be used to find out
   which Plateau Citizen IDs exist.
@@ -229,6 +235,14 @@ any page, and that every signed-in route is unreachable without a session.
 `apps/government/e2e/entitlements.spec.ts` does the equivalent for an officer:
 that the menu offers only what the account holds, and that typing the address of
 a page it does not hold produces nothing.
+
+`apps/security/e2e/` runs three officers of one agency — an investigator, a
+supervisor and a missing-person desk — through the same portal, because the
+property that matters most here is that belonging to the Police Command is not
+the same as being on the case. It asserts that a record cannot be opened without
+one; that a person not linked to the case is refused in the same words as a
+person who does not exist; that an investigator cannot close their own case; and
+that a closed case authorises nothing further, including its own file.
 
 ## Verified by tests
 

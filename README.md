@@ -27,14 +27,16 @@ supplied one, and is never required to obtain a PCID.
 | Public-safety analytics with small-number suppression         | Complete                                   |
 | Citizen portal (`apps/portal`)                                | Complete                                   |
 | Government portal (`apps/government`)                         | Complete                                   |
+| Security agency portal (`apps/security`)                      | Complete                                   |
 | Oversight: duplicate, correction and alert queues             | Complete                                   |
-| Security and emergency portals; mobile; GIS map               | Not started — see [Roadmap](#roadmap)      |
+| Emergency response portal; mobile; GIS map                    | Not started — see [Roadmap](#roadmap)      |
 
-Three things run: the REST API, documented in OpenAPI at `/api/v1/docs` (and
-written to `docs/openapi.json` by `npm run openapi`), and two portals — one for
-residents, one for government officers. Both portals are clients of that API
-like any other: neither holds a database credential or a signing key, and each
-is authorised exactly as the person signed into it is.
+Four things run: the REST API, documented in OpenAPI at `/api/v1/docs` (and
+written to `docs/openapi.json` by `npm run openapi`), and three portals — one
+for residents, one for government counters, one for security agencies. Every
+portal is a client of that API like any other: none holds a database credential
+or a signing key, and each is authorised exactly as the person signed into it
+is.
 
 ## The idea in one paragraph
 
@@ -53,12 +55,14 @@ packages/contracts    Shared vocabulary: classifications, purposes, actions,
                       roles, the field catalogue, and the PCID format.
 packages/policy       The authorisation engine. Pure, I/O-free, deny-by-default.
 services/api          The API service: NestJS over PostgreSQL.
-packages/portal-kit   What both portals share: the sealed session, the API
+packages/portal-kit   What the portals share: the sealed session, the API
                       client, the form controls and the design system.
 apps/portal           The citizen portal: Next.js, server-rendered, holding the
                       resident's session so no API token reaches the browser.
 apps/government       The government portal: search under a stated purpose, the
                       registration desk, and the oversight queues.
+apps/security         The security agency portal: case files, case-bound access
+                      to the register, missing and unidentified persons.
 db/migrations         Version-controlled schema migrations.
 docs/                 Architecture, security, privacy, operations and guides.
 ```
@@ -107,9 +111,11 @@ export PCID_API_URL=http://127.0.0.1:3000
 # One key per portal, each distinct from the API's two.
 export PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
 export GOVERNMENT_PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+export SECURITY_PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
 
 npm run dev:portal       # http://localhost:3100 — residents
-npm run dev:government   # http://localhost:3200 — officers
+npm run dev:government   # http://localhost:3200 — counter officers
+npm run dev:security     # http://localhost:3300 — security agencies
 ```
 
 Sign in with the credentials `npm run db:demo` printed: the resident with their
@@ -122,7 +128,8 @@ Or bring the whole stack up with Docker:
 
 ```bash
 export TOKEN_SIGNING_KEY=... SECRET_ENCRYPTION_KEY=... \
-       PORTAL_SESSION_KEY=... GOVERNMENT_PORTAL_SESSION_KEY=...
+       PORTAL_SESSION_KEY=... GOVERNMENT_PORTAL_SESSION_KEY=... \
+       SECURITY_PORTAL_SESSION_KEY=...
 docker compose up --build
 ```
 
@@ -130,7 +137,7 @@ docker compose up --build
 
 ```bash
 npm run verify              # format, lint, typecheck, unit and integration tests
-npm run test:e2e            # the citizen portal, in a browser, end to end
+npm run test:e2e            # all three portals, in a browser, end to end
 ```
 
 `npm run test:integration` compiles with `tsc` and runs against the compiled
@@ -141,29 +148,31 @@ than the one that ships.
 The integration suite creates and drops its own databases; point
 `TEST_ADMIN_DATABASE_URL` at a PostgreSQL superuser connection.
 
-`npm run test:e2e` runs both portal suites. Each starts an API and a portal of
-its own, against a database it recreates for the run, seeds them with `npm run
+`npm run test:e2e` runs all three portal suites. Each starts an API and a portal
+of its own, against a database it recreates for the run, seeds them with `npm run
 db:demo`, and drives a real browser through the journeys — including an
 accessibility audit of every page against WCAG 2.1 AA. They need a Chromium
 build: `npx playwright install chromium`.
 
 ## The controls, and where to read them
 
-| Control                                | Where it lives                                                                                               |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Sixteen ordered authorisation gates    | [`packages/policy/src/gates.ts`](packages/policy/src/gates.ts)                                               |
-| Field-by-field release                 | [`packages/policy/src/field-release.ts`](packages/policy/src/field-release.ts)                               |
-| What each field is, and who may see it | [`packages/contracts/src/field-catalogue.ts`](packages/contracts/src/field-catalogue.ts)                     |
-| Enforcement, audit and obligations     | [`services/api/src/policy/policy.service.ts`](services/api/src/policy/policy.service.ts)                     |
-| Append-only, hash-chained audit        | [`db/migrations/0003_audit.sql`](db/migrations/0003_audit.sql)                                               |
-| Permanent PCID allocation              | [`db/migrations/0004_citizen_registry.sql`](db/migrations/0004_citizen_registry.sql)                         |
-| The seven §75 propositions             | [`packages/policy/test/critical-authorization.test.ts`](packages/policy/test/critical-authorization.test.ts) |
-| The same, over HTTP                    | [`services/api/test/integration/authorization.test.ts`](services/api/test/integration/authorization.test.ts) |
-| The end-to-end acceptance scenario     | [`services/api/test/integration/acceptance.test.ts`](services/api/test/integration/acceptance.test.ts)       |
-| The portal's own security properties   | [`apps/portal/e2e/security.spec.ts`](apps/portal/e2e/security.spec.ts)                                       |
-| What an officer's account cannot do    | [`apps/government/e2e/entitlements.spec.ts`](apps/government/e2e/entitlements.spec.ts)                       |
-| WCAG 2.1 AA on every portal page       | [`apps/portal/e2e/accessibility.spec.ts`](apps/portal/e2e/accessibility.spec.ts)                             |
-| Every granted action has a route       | [`services/api/test/unit/action-coverage.test.ts`](services/api/test/unit/action-coverage.test.ts)           |
+| Control                                   | Where it lives                                                                                               |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Sixteen ordered authorisation gates       | [`packages/policy/src/gates.ts`](packages/policy/src/gates.ts)                                               |
+| Field-by-field release                    | [`packages/policy/src/field-release.ts`](packages/policy/src/field-release.ts)                               |
+| What each field is, and who may see it    | [`packages/contracts/src/field-catalogue.ts`](packages/contracts/src/field-catalogue.ts)                     |
+| Enforcement, audit and obligations        | [`services/api/src/policy/policy.service.ts`](services/api/src/policy/policy.service.ts)                     |
+| Append-only, hash-chained audit           | [`db/migrations/0003_audit.sql`](db/migrations/0003_audit.sql)                                               |
+| Permanent PCID allocation                 | [`db/migrations/0004_citizen_registry.sql`](db/migrations/0004_citizen_registry.sql)                         |
+| The seven §75 propositions                | [`packages/policy/test/critical-authorization.test.ts`](packages/policy/test/critical-authorization.test.ts) |
+| The same, over HTTP                       | [`services/api/test/integration/authorization.test.ts`](services/api/test/integration/authorization.test.ts) |
+| The end-to-end acceptance scenario        | [`services/api/test/integration/acceptance.test.ts`](services/api/test/integration/acceptance.test.ts)       |
+| The portal's own security properties      | [`apps/portal/e2e/security.spec.ts`](apps/portal/e2e/security.spec.ts)                                       |
+| What an officer's account cannot do       | [`apps/government/e2e/entitlements.spec.ts`](apps/government/e2e/entitlements.spec.ts)                       |
+| A record is reachable only under a case   | [`apps/security/e2e/investigation.spec.ts`](apps/security/e2e/investigation.spec.ts)                         |
+| One agency, three officers, three portals | [`apps/security/e2e/supervision.spec.ts`](apps/security/e2e/supervision.spec.ts)                             |
+| WCAG 2.1 AA on every portal page          | [`apps/portal/e2e/accessibility.spec.ts`](apps/portal/e2e/accessibility.spec.ts)                             |
+| Every granted action has a route          | [`services/api/test/unit/action-coverage.test.ts`](services/api/test/unit/action-coverage.test.ts)           |
 
 ## What the platform deliberately cannot do
 
@@ -206,12 +215,13 @@ These are absences by design, and each is held by a test:
 
 Delivered: platform foundation, authentication and authorisation, MDA
 administration, the PCID and citizen registry, the citizen portal, the
-government portal and its oversight queues, the data exchange and integration
-framework, asset registry integration, emergency response, security and case
-management, missing and unidentified persons, and analytics.
+government portal and its oversight queues, the security agency portal, the data
+exchange and integration framework, asset registry integration, emergency
+response, security and case management, missing and unidentified persons, and
+analytics.
 
-Remaining before a pilot: the security agency and emergency response web
-portals; the citizen, field officer and responder mobile applications; the GIS
+Remaining before a pilot: the emergency response web portal; the citizen, field
+officer and responder mobile applications; the GIS
 command map; the notification delivery workers; load testing; and an independent
 security assessment. [docs/architecture.md](docs/architecture.md#what-is-not-built-yet)
 sets out what each needs.

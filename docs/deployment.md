@@ -10,6 +10,7 @@
           ┌─────────────┴──────────────┐
    Citizen portal              API instance
    Government portal           API instance          (stateless, ≥2 each)
+   Security agency portal
           └─────────────┬──────────────┘
                         │
         ┌───────────────┼────────────────┐
@@ -22,12 +23,13 @@ Both tiers are stateless. Scaling out is adding instances; there is no local
 state in either container and nothing that assumes a single process.
 
 The portals reach the API over the internal network and are the only things that
-need to. Neither holds a database credential nor a connection to PostgreSQL or
+need to. None holds a database credential nor a connection to PostgreSQL or
 Redis: everything they know, they asked the API for, as the person signed into
 them.
 
-The government portal should be reachable only from the government network, and
-the citizen portal from the public internet. That is a gateway decision, not an
+The government portal should be reachable only from the government network, the
+security agency portal only from the security network within it, and the citizen
+portal from the public internet. That is a gateway decision, not an
 application one — the platform authorises identically either way — but it is the
 cheapest additional control available and there is no reason not to take it.
 
@@ -56,8 +58,13 @@ And on the portal tier, which shares none of the above:
 | `PORTAL_SESSION_TTL_SECONDS` | How long an idle portal session lasts before signing in again             |
 | `PORTAL_ALLOWED_ORIGINS`     | The portal's own public origins; a Server Action from anywhere else fails |
 
-Rotating `PORTAL_SESSION_KEY` invalidates every portal session, which signs every
-resident out. Nothing else is lost: the cookie is the only thing sealed with it.
+Each portal has its own set of these, prefixed `PORTAL_`, `GOVERNMENT_PORTAL_`
+and `SECURITY_PORTAL_`. The keys must all differ: one key per portal is what
+makes a stolen cookie from one useless against another.
+
+Rotating a portal's session key invalidates every session in that portal, which
+signs everybody using it out. Nothing else is lost: the cookie is the only thing
+sealed with it.
 
 Generate keys with:
 
@@ -124,6 +131,8 @@ docker build -t pcid-api:$(git rev-parse --short HEAD) .
 docker build -f apps/portal/Dockerfile -t pcid-portal:$(git rev-parse --short HEAD) .
 docker build -f apps/government/Dockerfile \
   -t pcid-government-portal:$(git rev-parse --short HEAD) .
+docker build -f apps/security/Dockerfile \
+  -t pcid-security-portal:$(git rev-parse --short HEAD) .
 ```
 
 The API runtime image carries compiled JavaScript, production dependencies and
@@ -199,11 +208,11 @@ Deliberately not a formality:
 - [ ] Every agency's data-sharing agreement status reflects a signed agreement
 - [ ] Compartment grants reviewed, each with a stated legal basis
 - [ ] Bootstrap administrator's recovery codes stored securely offline
-- [ ] All four keys distinct, from the secrets manager, never logged
-- [ ] Both portals reach the API over the internal network only
-- [ ] The government portal is not reachable from the public internet
+- [ ] All five keys distinct, from the secrets manager, never logged
+- [ ] Every portal reaches the API over the internal network only
+- [ ] Neither the government nor the security portal is reachable from the public internet
 - [ ] `*_ALLOWED_ORIGINS` list exactly each portal's public origins
-- [ ] Both portals served over TLS, so their session cookies are accepted as `Secure`
+- [ ] Every portal served over TLS, so their session cookies are accepted as `Secure`
 - [ ] Load testing performed — **not yet done**
 - [ ] Independent security assessment performed — **not yet done**
 

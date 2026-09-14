@@ -1,0 +1,27 @@
+{
+  "name": "@pcid/security-portal",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3300",
+    "build": "next build && node scripts/collect-standalone.mjs",
+    "start": "PORT=${PORT:-3300} node .next/standalone/apps/security/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.e2e.json --noEmit",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@pcid/portal-kit": "0.1.0",
+    "next": "^15.5.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@pcid/contracts": "0.1.0",
+    "@playwright/test": "1.56.1",
+    "@types/pg": "^8.15.5",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "pg": "^8.16.3"
+  }
+}

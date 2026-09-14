@@ -13,7 +13,8 @@
     "packages/portal-kit",
     "services/api",
     "apps/portal",
-    "apps/government"
+    "apps/government",
+    "apps/security"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
@@ -33,7 +34,8 @@
     "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test",
     "dev:portal": "npm run dev --workspace @pcid/portal",
     "dev:government": "npm run dev --workspace @pcid/government-portal",
-    "test:e2e": "npm run test:e2e --workspace @pcid/portal && npm run test:e2e --workspace @pcid/government-portal"
+    "dev:security": "npm run dev --workspace @pcid/security-portal",
+    "test:e2e": "npm run test:e2e --workspace @pcid/portal && npm run test:e2e --workspace @pcid/government-portal && npm run test:e2e --workspace @pcid/security-portal"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

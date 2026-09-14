@@ -18,14 +18,15 @@ and there is exactly one component that decides it.
   Resident's browser  ──►  apps/portal      ─┐
                            (their own record) │
                                               │   ┌────────────────────────────────────────┐
-  Officer's browser   ──►  apps/government   ─┼──►│            services/api                │
+  Counter officer     ──►  apps/government   ─┼──►│            services/api                │
                            (anybody's, under  │   │                                        │
                             a stated purpose) │   │  Guard ─► Controller ─► PolicyService ─┼─► @pcid/policy
                                               │   │            │              │            │   (pure, no I/O)
-  MDA systems  ───────────────────────────────┤   │            │              ▼            │
-  Mobile apps  ───────────────────────────────┘   │            │        AuditService ──────┼─► audit_event
-                                                  │            ▼                           │   (hash chained)
-                                                  │        Domain service ─────────────────┼─► PostgreSQL
+  Investigator        ──►  apps/security     ─┤   │            │              ▼            │
+                           (only under a case │   │            │        AuditService ──────┼─► audit_event
+                            they are on)      │   │            │                           │   (hash chained)
+  MDA systems  ───────────────────────────────┤   │            ▼                           │
+  Mobile apps  ───────────────────────────────┘   │        Domain service ─────────────────┼─► PostgreSQL
                                                   └────────────────────────────────────────┘
                                                                       ▲
                                                                       │ projections only,
@@ -34,10 +35,16 @@ and there is exactly one component that decides it.
                                                                 Agency systems
 ```
 
-Both portals are server-rendered and hold their own session; neither puts a
+All three portals are server-rendered and hold their own session; none puts a
 token in a browser. They share `packages/portal-kit` for exactly that reason -
-two copies of a session-sealing routine is one copy that quietly stops being
-reviewed.
+three copies of a session-sealing routine is two copies that quietly stop being
+reviewed. Each seals its cookie with its own key and sets its own idle timeout,
+so a compromise of one produces nothing usable against another.
+
+What they do not share is vocabulary. The same audit row is described three
+ways, because "your record was opened", "the record was released to you at the
+counter" and "opened under CASE-2026-00928" are the same event told to three
+audiences, and one wording would be wrong for two of them.
 
 ### `packages/contracts` — the vocabulary
 
@@ -157,6 +164,47 @@ against the officer's name.
 **A withheld card is shown as withheld.** An officer who cannot tell the
 difference between "no property is registered to this person" and "you may not
 see their property" will draw the wrong conclusion from a blank page (§29).
+
+### `apps/security` — what an investigator sees
+
+The third portal reaches the same register as the second, under a materially
+different authority, and the interface is shaped by that difference rather than
+decorated to hide it.
+
+**A record opens only under a case.** There is no route from a search result
+into a record. A search returns a thin projection whose sole action is _Link to
+CASE-…_, and linking is a separate act that demands a written justification and
+is audited in its own right. That sequence exists to remove the pattern where an
+officer learns what they wanted from a results list and never formally opens
+anything. Reaching `/person/:pcid` without a case does not fail obscurely: the
+page says that the policy engine refuses an investigative read that names no
+case, and offers the case list.
+
+**The working case is a convenience and never an authority.** The session
+carries the case an officer is working under so they do not retype it. It is
+sent as the case reference on each request and the engine decides afresh every
+time — the case has to be active, this officer has to be assigned to it, and the
+person has to be linked to it. The banner says so on every page it appears on.
+
+**Assignment is reachable from outside the case.** Reading a case file is
+case-bound; assigning an officer to a case deliberately is not, because
+otherwise a case becomes unjoinable the moment the officer holding it leaves.
+The assignment form therefore also lives on the case list, where it needs
+nothing but a case number — the engine still requires the case to belong to the
+account's agency, to be active, and to sit within its clearance.
+
+**A closed case authorises nothing, including its own file.** Closing is
+irreversible through this interface and the file is no longer readable by
+anybody, so the portal sends the closing officer back to the list with an
+explanation rather than to a refusal for the thing they just did. For the same
+reason the status form offers no way to set SUSPENDED: a suspended case
+authorises no access, and changing a case is itself case-bound, so it would be a
+door with no handle on the far side.
+
+**Break glass is shown as absent, not omitted.** No investigative role holds
+`BREAK_GLASS_INITIATE` — it belongs to emergency-response roles — so the page
+says that plainly. An officer who finds nothing concludes the platform cannot do
+it, and then does something worse.
 
 ## Decisions worth explaining
 
@@ -283,12 +331,12 @@ local state, so a move to Kubernetes is a deployment change rather than a redesi
 
 ## What is not built yet
 
-The API and the two portals are the surface today. Still to build:
+The API and the three portals are the surface today. Still to build:
 
-- **Web portals** for security agencies and emergency services. The API returns
-  everything they need, including which cards are restricted and why, so each
-  interface can say "Restricted information" honestly — which is what the
-  citizen and government portals already do.
+- **A web portal for emergency services**. The API returns everything it needs,
+  including which cards are restricted and why, so the interface can say
+  "Restricted information" honestly — which is what the three existing portals
+  already do.
 - **Mobile applications** for citizens, field officers and responders, including
   the controlled offline mode described in §56 — encrypted, expiring,
   device-bound, minimal, revocable, and never a copy of the registry.

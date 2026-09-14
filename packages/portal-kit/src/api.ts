@@ -178,7 +178,14 @@ async function callerAddress(): Promise<string | null> {
   return store.get('x-real-ip');
 }
 
-/** Unwrap a result for a page, treating any failure as "nothing to show". */
-export function dataOr<T, F>(result: ApiResult<T>, fallback: F): T | F {
-  return result.ok ? result.data : fallback;
+/**
+ * Unwrap a result for a page, treating any failure as "nothing to show".
+ *
+ * `null` is accepted as well as a result, because a portal that builds its
+ * calls from the account's entitlements does not make the ones it knows will be
+ * refused - `can(session, 'CASE_VIEW') ? callApi(...) : null` - and "we did not
+ * ask" wants the same empty rendering as "we asked and were refused".
+ */
+export function dataOr<T, F>(result: ApiResult<T> | null | undefined, fallback: F): T | F {
+  return result != null && result.ok ? result.data : fallback;
 }
