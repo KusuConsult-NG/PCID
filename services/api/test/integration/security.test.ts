@@ -313,6 +313,41 @@ describe('§74 security tests', () => {
     assert.deepEqual(problems, [], 'the chain must still verify');
   });
 
+  test('concurrent writers cannot fork the audit chain', async () => {
+    const { Database } = await import('../../src/database/pool');
+    const db = context.app.get(Database);
+
+    // One page of the government portal issues five authorised calls at once,
+    // and the service runs behind a load balancer, so simultaneous audit writes
+    // are the ordinary case. Before the chain trigger took a lock, two writers
+    // read the same tail, wrote the same prev_hash, and the chain forked - which
+    // verify_audit_chain() reports as tampering that never happened.
+    const before = await db.queryOne<{ count: string }>(
+      'SELECT count(*)::text AS count FROM audit_event',
+    );
+
+    await Promise.all(
+      Array.from({ length: 24 }, (_, index) =>
+        revenueClient
+          .get(`/api/v1/citizens/${pcid}?purpose=SERVICE_DELIVERY`)
+          .expect((response) => {
+            assert.ok(response.status < 500, `concurrent read ${index} failed`);
+          }),
+      ),
+    );
+
+    const after = await db.queryOne<{ count: string }>(
+      'SELECT count(*)::text AS count FROM audit_event',
+    );
+    assert.ok(
+      Number(after?.count ?? 0) > Number(before?.count ?? 0) + 20,
+      'the concurrent calls each wrote their own audit record',
+    );
+
+    const problems = await db.query('SELECT * FROM verify_audit_chain()');
+    assert.deepEqual(problems, [], 'the chain is intact after concurrent writes');
+  });
+
   test('a PCID allocation can never be deleted or recycled', async () => {
     const { Database } = await import('../../src/database/pool');
     const db = context.app.get(Database);

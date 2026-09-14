@@ -79,8 +79,14 @@ jobs:
           name: openapi
           path: docs/openapi.json
 
-  portal:
-    name: Citizen portal end-to-end and accessibility tests
+  portals:
+    name: Portal end-to-end and accessibility tests
+    strategy:
+      fail-fast: false
+      matrix:
+        portal:
+          - { name: Citizen, workspace: '@pcid/portal' }
+          - { name: Government, workspace: '@pcid/government-portal' }
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -116,17 +122,17 @@ jobs:
       - name: Install the browser
         run: npx playwright install --with-deps chromium
 
-      # Starts its own API and portal against a database it creates, so nothing
-      # here needs to be wired up by hand.
-      - name: End-to-end and accessibility tests
-        run: npm run test:e2e
+      # Each suite starts its own API and portal against a database it creates,
+      # on ports of its own, so nothing here needs to be wired up by hand.
+      - name: ${{ matrix.portal.name }} portal end-to-end and accessibility tests
+        run: npm run test:e2e --workspace ${{ matrix.portal.workspace }}
 
       - name: Upload the failure trace
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-trace
-          path: apps/portal/e2e/.results/
+          name: playwright-trace-${{ matrix.portal.name }}
+          path: apps/*/e2e/.results/
           retention-days: 7
 
   container:
@@ -149,4 +155,10 @@ jobs:
         with:
           context: .
           file: apps/portal/Dockerfile
+          push: false
+      - name: Build the government portal image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/government/Dockerfile
           push: false

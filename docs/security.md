@@ -151,12 +151,41 @@ credential. All access is through the API.
   correlation id that ties the client report, the operator log and the audit row
   together without using personal data.
 
-## The citizen portal
+## The audit chain under concurrency
 
-The portal is a separate trust boundary and is treated as one. It is a client of
-the API with no database credential, no token-signing key and no entitlement of
-its own; it is authorised exactly as the resident signed into it is, through the
-same policy engine as any other caller.
+The chain trigger originally read its predecessor with an unlocked
+`SELECT ... ORDER BY seq DESC LIMIT 1`. Two transactions inserting at the same
+time both read the same tail, both wrote the same `prev_hash`, and the chain
+forked — so `verify_audit_chain()` reported tampering that had not happened.
+Measured on sixteen simultaneous inserts, fifteen landed on a broken chain.
+
+This was found by the government portal's end-to-end suite, on a page that
+issues five authorised calls in parallel. It matters more than a false alarm:
+tamper evidence that fires during ordinary traffic teaches the reviewer to
+dismiss the alarm, which is the failure mode the chain exists to prevent.
+
+[Migration 0011](../db/migrations/0011_audit_chain_serialisation.sql) fixes both
+halves of it. The chain head is one locked row, read with `SELECT ... FOR
+UPDATE` — which re-reads the latest committed version after waiting, where a
+plain `SELECT` stays inside the inserting statement's snapshot and an advisory
+lock does not help. And the sequence number now comes from that same row rather
+than from a `bigserial`, because sequence values are handed out before commit,
+so the order the chain was forged in and the order it is verified in would
+otherwise disagree. The trigger is `SECURITY DEFINER` and the application role
+holds no privilege on the head table at all, so no application path can choose
+its own predecessor. `security.test.ts` fires twenty-four concurrent authorised
+reads and asserts the chain is still intact.
+
+## The portals
+
+Each portal is a separate trust boundary and is treated as one. Both are clients
+of the API with no database credential, no token-signing key and no entitlement
+of their own; each is authorised exactly as the person signed into it is,
+through the same policy engine as any other caller. They seal their sessions
+with different keys, so a compromise of one does not produce a usable cookie for
+the other.
+
+The controls below hold for both.
 
 - **No token in the browser.** The portal renders on the server and holds the
   resident's access and refresh tokens itself. The browser gets a cookie
@@ -169,7 +198,16 @@ same policy engine as any other caller.
   layer.
 - **A desk-issued passphrase cannot stay in use.** The account is flagged at
   issue, and every signed-in page redirects to the change-passphrase form until
-  it is replaced. Replacing it ends every other session.
+  it is replaced. Replacing it ends every other session. Until this phase this
+  held for residents only: `government_user.must_change_password` was set at
+  account creation, the login endpoint reported it, and no endpoint could clear
+  it — so every officer account ran indefinitely on a secret an administrator
+  also knew.
+- **Step-up is handled, not worked around.** An operation that changes the
+  register or somebody's access to it requires a session re-proved minutes ago,
+  not one proved this morning and left open on a counter. The government portal
+  sends the officer to re-authenticate and returns them to the task, and the
+  return address is refused unless it is a path within the application.
 - **Sign-in reveals nothing.** A wrong passphrase and an identifier that was
   never issued produce the same message, so the page cannot be used to find out
   which Plateau Citizen IDs exist.
@@ -188,6 +226,9 @@ no-referrer`, `nosniff`, geolocation permitted only to the page itself, and
 `apps/portal/e2e/security.spec.ts` asserts the properties above against the
 running build — including that no JWS and no bearer header appears in the HTML of
 any page, and that every signed-in route is unreachable without a session.
+`apps/government/e2e/entitlements.spec.ts` does the equivalent for an officer:
+that the menu offers only what the account holds, and that typing the address of
+a page it does not hold produces nothing.
 
 ## Verified by tests
 
@@ -228,7 +269,7 @@ Stated plainly, because a security document that only lists strengths is not one
   behavioural detection §32 envisages is configured but not implemented.
 - **Secrets management** is assumed to be provided by the deployment platform;
   this repository defines the interface and never carries a secret.
-- **Portal session-key rotation** signs every resident out. The ciphertext format
+- **Portal session-key rotation** signs everyone using that portal out. The ciphertext format
   carries a version, so a two-key window is possible; it is not implemented.
 
 ## Reporting a vulnerability

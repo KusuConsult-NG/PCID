@@ -26,12 +26,15 @@ supplied one, and is never required to obtain a PCID.
 | Integration framework and linked-record projections           | Complete (sandbox and production adapters) |
 | Public-safety analytics with small-number suppression         | Complete                                   |
 | Citizen portal (`apps/portal`)                                | Complete                                   |
-| Government, security and emergency portals; mobile; GIS map   | Not started — see [Roadmap](#roadmap)      |
+| Government portal (`apps/government`)                         | Complete                                   |
+| Oversight: duplicate, correction and alert queues             | Complete                                   |
+| Security and emergency portals; mobile; GIS map               | Not started — see [Roadmap](#roadmap)      |
 
-Two things run: the REST API, documented in OpenAPI at `/api/v1/docs` (and
-written to `docs/openapi.json` by `npm run openapi`), and the citizen portal at
-`apps/portal`, which is a client of that API like any other — it holds no
-database credential and no signing key.
+Three things run: the REST API, documented in OpenAPI at `/api/v1/docs` (and
+written to `docs/openapi.json` by `npm run openapi`), and two portals — one for
+residents, one for government officers. Both portals are clients of that API
+like any other: neither holds a database credential or a signing key, and each
+is authorised exactly as the person signed into it is.
 
 ## The idea in one paragraph
 
@@ -50,8 +53,12 @@ packages/contracts    Shared vocabulary: classifications, purposes, actions,
                       roles, the field catalogue, and the PCID format.
 packages/policy       The authorisation engine. Pure, I/O-free, deny-by-default.
 services/api          The API service: NestJS over PostgreSQL.
+packages/portal-kit   What both portals share: the sealed session, the API
+                      client, the form controls and the design system.
 apps/portal           The citizen portal: Next.js, server-rendered, holding the
                       resident's session so no API token reaches the browser.
+apps/government       The government portal: search under a stated purpose, the
+                      registration desk, and the oversight queues.
 db/migrations         Version-controlled schema migrations.
 docs/                 Architecture, security, privacy, operations and guides.
 ```
@@ -93,24 +100,29 @@ anything else, and refuses to run against a production configuration.
 npm run db:demo
 ```
 
-### The citizen portal
+### The portals
 
 ```bash
-# A third key, distinct from the API's two.
-export PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
 export PCID_API_URL=http://127.0.0.1:3000
+# One key per portal, each distinct from the API's two.
+export PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+export GOVERNMENT_PORTAL_SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
 
-npm run dev:portal     # http://localhost:3100
+npm run dev:portal       # http://localhost:3100 — residents
+npm run dev:government   # http://localhost:3200 — officers
 ```
 
-Sign in with the Plateau Citizen ID and passphrase that `npm run db:demo`
-printed. The portal will ask for a passphrase of your own before it shows you
-anything.
+Sign in with the credentials `npm run db:demo` printed: the resident with their
+Plateau Citizen ID, an officer with their work email address and the six-digit
+code from the authenticator secret beside it. Both will ask for a passphrase of
+your own before showing you anything, because the one you were given was chosen
+by somebody else.
 
 Or bring the whole stack up with Docker:
 
 ```bash
-export TOKEN_SIGNING_KEY=... SECRET_ENCRYPTION_KEY=... PORTAL_SESSION_KEY=...
+export TOKEN_SIGNING_KEY=... SECRET_ENCRYPTION_KEY=... \
+       PORTAL_SESSION_KEY=... GOVERNMENT_PORTAL_SESSION_KEY=...
 docker compose up --build
 ```
 
@@ -129,11 +141,11 @@ than the one that ships.
 The integration suite creates and drops its own databases; point
 `TEST_ADMIN_DATABASE_URL` at a PostgreSQL superuser connection.
 
-`npm run test:e2e` starts an API and a portal of its own, against a database it
-recreates for the run, seeds them with `npm run db:demo`, and drives a real
-browser through a resident's journeys — including an accessibility audit of
-every page against WCAG 2.1 AA. It needs a Chromium build: `npx playwright
-install chromium`.
+`npm run test:e2e` runs both portal suites. Each starts an API and a portal of
+its own, against a database it recreates for the run, seeds them with `npm run
+db:demo`, and drives a real browser through the journeys — including an
+accessibility audit of every page against WCAG 2.1 AA. They need a Chromium
+build: `npx playwright install chromium`.
 
 ## The controls, and where to read them
 
@@ -149,7 +161,9 @@ install chromium`.
 | The same, over HTTP                    | [`services/api/test/integration/authorization.test.ts`](services/api/test/integration/authorization.test.ts) |
 | The end-to-end acceptance scenario     | [`services/api/test/integration/acceptance.test.ts`](services/api/test/integration/acceptance.test.ts)       |
 | The portal's own security properties   | [`apps/portal/e2e/security.spec.ts`](apps/portal/e2e/security.spec.ts)                                       |
+| What an officer's account cannot do    | [`apps/government/e2e/entitlements.spec.ts`](apps/government/e2e/entitlements.spec.ts)                       |
 | WCAG 2.1 AA on every portal page       | [`apps/portal/e2e/accessibility.spec.ts`](apps/portal/e2e/accessibility.spec.ts)                             |
+| Every granted action has a route       | [`services/api/test/unit/action-coverage.test.ts`](services/api/test/unit/action-coverage.test.ts)           |
 
 ## What the platform deliberately cannot do
 
@@ -191,14 +205,14 @@ These are absences by design, and each is held by a test:
 ## Roadmap
 
 Delivered: platform foundation, authentication and authorisation, MDA
-administration, the PCID and citizen registry, the citizen portal, the data
-exchange and integration framework, asset registry integration, emergency
-response, security and case management, missing and unidentified persons, and
-analytics.
+administration, the PCID and citizen registry, the citizen portal, the
+government portal and its oversight queues, the data exchange and integration
+framework, asset registry integration, emergency response, security and case
+management, missing and unidentified persons, and analytics.
 
-Remaining before a pilot: the government, security and emergency web portals;
-the citizen, field officer and responder mobile applications; the GIS command
-map; the notification delivery workers; load testing; and an independent
+Remaining before a pilot: the security agency and emergency response web
+portals; the citizen, field officer and responder mobile applications; the GIS
+command map; the notification delivery workers; load testing; and an independent
 security assessment. [docs/architecture.md](docs/architecture.md#what-is-not-built-yet)
 sets out what each needs.
 

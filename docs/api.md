@@ -171,9 +171,10 @@ searched for.
 | Authorisation            | `/access-requests/*`, `/break-glass/*`                      | Approvals and break glass                           |
 | Linked records           | `/vehicles/*`, `/properties/*`                              | Records other agencies own                          |
 | Citizen portal           | `/me/*`                                                     | Own record, credential, contacts, history, security |
+| Oversight                | `/correction-requests/*`, `/alerts/*`                       | Correction and alert review queues                  |
 | Audit                    | `/audit/*`                                                  | Search and chain verification                       |
 | Analytics                | `/analytics/*`                                              | Aggregates with small-number suppression            |
-| Administration           | `/agencies/*`, `/users/*`                                   | Registry and user administration                    |
+| Administration           | `/agencies/*`, `/users/*`                                   | Registry, user administration, your own account     |
 | Integrations             | `/integrations/*`                                           | Data sources and synchronisation                    |
 | Operations               | `/health/*`                                                 | Liveness and readiness                              |
 
@@ -196,6 +197,25 @@ invalidates every token issued against it at the same moment.
 
 Both kinds of check — a scanned code and a typed identifier — appear in the
 resident's own verification history, naming the office that made them.
+
+## Every route names the entitlement it needs
+
+Each operation carries `x-pcid-actions`: the authorisation actions it performs.
+An integrator can therefore see which entitlement a call needs before making it,
+rather than discovering it from a refusal.
+
+It is also asserted. `services/api/test/unit/action-coverage.test.ts` compares
+the actions the seeded roles grant against the actions the documented routes
+perform, in both directions. An action a role grants with no route behind it is
+an entitlement nobody can exercise — it reads, in the role definition and in
+`GET /auth/me`, as a capability the account has, so an administrator assigns the
+role believing the work can be done and the officer finds there is nothing to
+click. Three of those survived four phases unnoticed, which is why this is a
+test rather than a review step.
+
+Actions seeded ahead of the surface that will perform them are listed explicitly
+in that test with the surface named, and the test fails if the list grows or goes
+stale.
 
 ## Versioning
 

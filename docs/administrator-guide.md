@@ -98,6 +98,19 @@ citizen data until the authenticator is confirmed** — the engine refuses a
 government user who is not MFA-enrolled — so hand it over promptly and have them
 confirm it at `POST /api/v1/users/me/mfa/confirm`.
 
+The passphrase you type here is one **you** know, so the account is created
+flagged to change it. The officer is sent to the change-passphrase form on first
+sign-in and cannot reach anything else until they replace it
+(`POST /api/v1/users/me/password`). Do not skip this by handing somebody a
+passphrase and telling them it is fine: until it is changed, two people can sign
+in as them, and the audit record will name only one.
+
+`GET /api/v1/users` lists the accounts you administer, with the two fields an
+access review actually turns on: whether the authenticator was ever confirmed,
+and when the account was last used. An account nobody has signed into for months
+is the one to ask about. It carries no citizen data, because administering the
+platform is not an entitlement to the register.
+
 The temporary password must meet policy: 14+ characters, mixed case, a digit, and
 no part of the person's own name or email address.
 
@@ -146,10 +159,23 @@ review — which is what it should be.
 one thing to look at daily. Every grant must be reviewed within 24 hours, and the
 queue flags overdue ones. An officer cannot review their own.
 
-**Alerts.** Identity integrity alerts describe _records_, not people — a
+**Alerts** (`GET /api/v1/alerts?status=OPEN`, or the Alerts page in the
+government portal). Identity integrity alerts describe _records_, not people — a
 registration matching an existing one. Security alerts describe _account
 activity_ — unusual search volume, repeated refusals. Neither is an accusation;
-both need a person to look.
+both need a person to look. Each carries the explanation that produced it, and
+dismissing one as a false positive is a first-class outcome: record it, because
+it is how the thresholds get better.
+
+**Correction requests** (`GET /api/v1/correction-requests?status=SUBMITTED`).
+Worked oldest first. Approving one writes the new value onto the identity
+register in the same transaction that records your decision, and tells the
+resident. If you are not certain, ask for evidence rather than approving.
+
+**Duplicate candidates** (`GET /api/v1/citizens/duplicates`). A registration the
+platform stopped because it closely matches an existing record. Nothing is
+issued and nothing is merged until a named officer decides, and the note you
+write is what a reviewer months from now will have.
 
 **Agreement expiry.** Review `data_sharing_expires_at` monthly. A lapse is
 correct behaviour, but a surprise one strands an agency.
@@ -164,6 +190,7 @@ ever does not, treat it as a P1 and follow
 | -------------------------- | --------------------------------------------------------------------------- |
 | One account                | `UPDATE government_user SET status = 'SUSPENDED'`                           |
 | One account's sessions     | `UPDATE user_session SET revoked_at = now() WHERE government_user_id = ...` |
+| Your own sessions          | `DELETE /api/v1/users/me/sessions/{id}`, or the My account page             |
 | A whole agency             | `PATCH /api/v1/agencies/{id}/status { "status": "SUSPENDED" }`              |
 | Citizen data for an agency | Set `dataSharingAgreement` to `SUSPENDED`                                   |
 | A break-glass grant        | `UPDATE break_glass_grant SET status = 'REVOKED'`                           |

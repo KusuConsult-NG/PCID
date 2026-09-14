@@ -6,6 +6,7 @@ import {
   alertQueueSchema,
   alertReviewSchema,
   correctionDecisionSchema,
+  correctionOnBehalfSchema,
   correctionQueueSchema,
 } from '../common/dto';
 import { documentRoute } from '../common/openapi/registry';
@@ -42,6 +43,20 @@ documentRoute({
   body: correctionDecisionSchema,
   requiresStepUp: true,
   actions: ['CORRECTION_REQUEST_REVIEW'],
+});
+documentRoute({
+  method: 'post',
+  path: '/api/v1/citizens/:pcid/correction-requests',
+  tag: 'Oversight',
+  summary: 'Raise a correction on somebody’s behalf, from a counter',
+  description:
+    'An officer looking at a record with a wrong detail should be able to do something about it ' +
+    'rather than send the resident home to raise it themselves. It goes to the same queue under ' +
+    'the same review, stored as the officer’s request with their agency, and the resident is told ' +
+    'that it was raised - before it is decided, not after.',
+  parameters: [{ name: 'pcid', in: 'path', description: 'Plateau Citizen ID.' }],
+  body: correctionOnBehalfSchema,
+  actions: ['CORRECTION_REQUEST_CREATE'],
 });
 documentRoute({
   method: 'get',
@@ -120,6 +135,27 @@ export class OversightController {
       reference,
       input.decision,
       input.note,
+      contextOf(request),
+    );
+  }
+
+  @Post('citizens/:pcid/correction-requests')
+  async raiseCorrection(
+    @Actor() actor: AuthenticatedActor,
+    @Param('pcid') pcid: string,
+    @Body() body: unknown,
+    @Req() request: Request,
+  ): Promise<unknown> {
+    const input = validate(correctionOnBehalfSchema, body);
+    return this.corrections.createOnBehalf(
+      actor,
+      pcid,
+      {
+        fieldPath: input.fieldPath,
+        requestedValue: input.requestedValue,
+        justification: input.justification,
+        evidenceReference: input.evidenceReference ?? null,
+      },
       contextOf(request),
     );
   }

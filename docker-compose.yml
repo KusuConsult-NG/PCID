@@ -97,5 +97,28 @@ services:
     security_opt: ['no-new-privileges:true']
     cap_drop: ['ALL']
 
+  government-portal:
+    build:
+      context: .
+      dockerfile: apps/government/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3200
+      PCID_API_URL: http://api:3000
+      # A fourth key. Each portal seals its own session cookie, so a compromise
+      # of one does not produce a usable cookie for the other.
+      GOVERNMENT_PORTAL_SESSION_KEY: ${GOVERNMENT_PORTAL_SESSION_KEY:?set GOVERNMENT_PORTAL_SESSION_KEY}
+      # Shorter than the citizen portal's: a resident's session is open on their
+      # own phone, an officer's on a shared counter machine.
+      GOVERNMENT_PORTAL_SESSION_TTL_SECONDS: 900
+      GOVERNMENT_PORTAL_ALLOWED_ORIGINS: http://localhost:3200
+    ports: ['3200:3200']
+    depends_on:
+      api: { condition: service_started }
+    read_only: true
+    tmpfs: ['/tmp']
+    security_opt: ['no-new-privileges:true']
+    cap_drop: ['ALL']
+
 volumes:
   postgres-data:

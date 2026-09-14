@@ -5,6 +5,7 @@ import { AccessController } from './access/access.controller';
 import { AccessService } from './access/access.service';
 import { AdminController } from './iam/admin.controller';
 import { AdminService } from './iam/admin.service';
+import { GovernmentAccountService } from './iam/account.service';
 import { AnalyticsController } from './analytics/analytics.controller';
 import { AnalyticsService } from './analytics/analytics.service';
 import { AssetsController } from './assets/assets.controller';
@@ -77,6 +78,7 @@ import { SecurityModule } from './security/security.module';
     ActorService,
     AuthService,
     AdminService,
+    GovernmentAccountService,
     AuditService,
     PolicyService,
     PcidService,

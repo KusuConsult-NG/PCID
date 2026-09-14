@@ -33,7 +33,7 @@ npm run db:seed       # reference data; also idempotent
 
 These are the guarantees that do not depend on application code being correct.
 
-### The audit trail cannot be rewritten
+### The audit trail cannot be rewritten, or forked
 
 `audit_event` has triggers refusing `UPDATE`, `DELETE` and `TRUNCATE`, and
 `pcid_app` is not granted those privileges either. Two independent controls, so a
@@ -51,6 +51,19 @@ SELECT * FROM verify_audit_chain(1000, 2000); -- a range
 
 An event marked `ACCESS_RESTRICTED_FROM_CITIZEN` must carry a
 `restriction_basis`; a check constraint enforces it.
+
+The chain is extended under a row lock. `audit_chain_head` holds one row — the
+hash of the last link and the number the next one carries — and the trigger reads
+it with `SELECT ... FOR UPDATE`, which re-reads the latest committed version
+after waiting. A plain `SELECT` cannot: under READ COMMITTED the trigger runs
+inside the inserting statement's snapshot, so concurrent writers read the same
+tail and the chain forks. The sequence number comes from that same row rather
+than from a `bigserial`, because sequence values are handed out before commit and
+the order the chain is forged in has to be the order it is verified in.
+
+The trigger is `SECURITY DEFINER` and `pcid_app` holds no privilege on
+`audit_chain_head` at all, so no application path — not even a direct connection
+— can choose its own predecessor.
 
 ### A PCID is never recycled
 

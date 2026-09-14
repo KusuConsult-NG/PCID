@@ -1,0 +1,93 @@
+/*
+ * The government portal's stylesheet.
+ *
+ * The design system is the shared one: the two portals are one government
+ * speaking to two audiences and should not look like two governments. What is
+ * here is what must differ.
+ *
+ * The masthead is deep blue rather than Plateau green. That is not decoration.
+ * An officer who works in both applications, and a resident looking over the
+ * counter, should be able to tell at a glance which one is on screen - the
+ * citizen portal shows one person their own record, and this one can open
+ * anybody's.
+ */
+@import '@pcid/portal-kit/styles.css';
+
+:root {
+  --gov: #16324f;
+  --gov-strong: #0f2437;
+  --gov-wash: #e8eef4;
+}
+
+:root:not([data-theme='light']) {
+  @media (prefers-color-scheme: dark) {
+    --gov: #0f2437;
+    --gov-wash: #16202b;
+  }
+}
+
+.masthead-government {
+  background: var(--gov);
+  border-bottom-color: var(--gov-strong);
+}
+
+/* The purpose an officer stated, shown wherever a record is on screen. */
+.purpose-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--gov);
+  border-radius: var(--radius);
+  background: var(--gov-wash);
+  margin-bottom: 1.25rem;
+}
+
+.purpose-banner strong {
+  font-weight: 700;
+}
+
+/* Two people side by side, for a duplicate review. */
+.comparison {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.comparison .facts dd.differs {
+  background: var(--warning-wash);
+  border-radius: 4px;
+  padding-inline: 0.3rem;
+  font-weight: 600;
+}
+
+.score {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--step-2);
+  font-weight: 700;
+}
+
+/* A queue count in the navigation and on the home page. */
+.queue-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.queue-count {
+  font-size: var(--step-4);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.entitlements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}

@@ -139,7 +139,7 @@ Alerts describe records and events, never people. "Identity Integrity Alert", no
 | Right         | Today                                                                                       |
 | ------------- | ------------------------------------------------------------------------------------------- |
 | Access        | Citizen portal: own record, linked records and access history (complete)                    |
-| Rectification | Correction request workflow (complete)                                                      |
+| Rectification | Correction request workflow, resident-raised or counter-raised, with review (complete)      |
 | Erasure       | Not applicable to a statutory identity register; the PCID allocation is permanent by design |
 | Restriction   | Records can be suspended; per-field restriction is not implemented                          |
 | Objection     | Handled administratively by the DPO                                                         |

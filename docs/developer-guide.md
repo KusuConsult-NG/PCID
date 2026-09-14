@@ -38,9 +38,12 @@ service holding another.
 ```
 packages/contracts   Vocabulary. Depends on nothing.
 packages/policy      The engine. Depends on contracts only. No I/O.
-services/api         Everything else. Depends on both.
-apps/portal          The citizen portal. Depends on the API over HTTP and on
-                     nothing in this repository - not even the contracts.
+packages/portal-kit  What the portals share: the sealed session, the API client,
+                     the form controls, the design system. No platform logic.
+services/api         Everything else. Depends on contracts and policy.
+apps/portal          The citizen portal. Depends on portal-kit and on the API
+                     over HTTP; on nothing else in this repository.
+apps/government      The government portal. The same.
 ```
 
 The rule is one-directional and worth protecting: `@pcid/policy` must never import
@@ -70,17 +73,21 @@ and can be run repeatedly.
 
 ### The end-to-end suite
 
-`npm run test:e2e` needs nothing running. It builds the API, recreates a database
-of its own, starts the service on port 3400 and the portal's standalone build on
-3401, seeds them with `npm run db:demo -- --json`, and drives Chromium through a
-resident's journeys — then audits every page against WCAG 2.1 AA with axe.
+`npm run test:e2e` runs both suites and needs nothing running. Each builds the
+API, recreates a database of its own, starts the service and the portal's
+standalone build on ports of its own (3400/3401 for the citizen portal,
+3402/3403 for the government one), seeds them with `npm run db:demo -- --json`,
+and drives Chromium through the journeys — then audits every page against WCAG
+2.1 AA with axe.
 
-It runs in three ordered projects. `provision` signs the resident in for the first
-time and makes them choose a passphrase, which is both the first journey and how
-the other projects get a session. `portal` is the journeys and the portal's
-security properties. `accessibility` runs last, so the pages it audits hold the
-records the journeys created — an empty table hides most of the mistakes a
-populated one makes.
+Both run in ordered projects, and `provision` is always the first: it signs each
+account in for the first time and makes it choose a passphrase, which is both the
+first journey and how the other projects get a session. The government suite
+then runs `registration`, `counter` and `oversight` as three _different_
+officers, which is the point — an entitlement test that runs as one account
+proves very little. `accessibility` runs last in both, so the pages it audits
+hold the records the journeys created: an empty table hides most of the mistakes
+a populated one makes.
 
 Chromium has to be present: `npx playwright install chromium`. Playwright is
 pinned exactly, because a minor bump expects a different browser revision than the
@@ -245,9 +252,9 @@ signed agreement; is the authenticator confirmed; does a role grant the action; 
 the purpose one that action allows; is the field catalogued for that purpose; is
 there a case or incident and is the account on it.
 
-## Working on the portal
+## Working on a portal
 
-The portal renders on the server and holds the session; see
+Both portals render on the server and hold the session; see
 [ADR 0005](adr/0005-portal-holds-the-session.md) for why. Three rules follow from
 that and are worth keeping:
 
@@ -259,7 +266,11 @@ that and are worth keeping:
   and an absent record must not look the same (§29).
 - **It has to work without JavaScript.** Forms are Server Actions and navigation
   is links. Reach for a client component only when there is no other way, as with
-  the opt-in location control on the report page.
+  the opt-in location control on the citizen portal's report page.
+- **Anything shared goes in `packages/portal-kit`.** The platform's vocabulary
+  does not: "Viewed your record" and "Opened a citizen record" are one audit row
+  described to two audiences, and a shared label would be wrong for one of them.
+  Each portal keeps its own `src/lib/vocabulary.ts`.
 
 Where a page shows the same field in more than one form, give each control its own
 `id` (`<Field name="fullName" id={...} />`). The name is what the action receives;
@@ -269,8 +280,10 @@ accessibility failure the axe suite will fail on.
 ## Pull requests
 
 - `npm run verify` and the integration suite pass.
-- A change to the portal passes `npm run test:e2e`, including the accessibility
-  audit.
+- A change to either portal passes `npm run test:e2e`, including the
+  accessibility audit.
+- A new action is performed by a documented route, or is listed in
+  `AWAITING_A_SURFACE` with the surface that will perform it named.
 - Any authorisation change has a test that fails without it.
 - Any new field has a catalogue entry and a release test.
 - Migrations are new files, never edits.

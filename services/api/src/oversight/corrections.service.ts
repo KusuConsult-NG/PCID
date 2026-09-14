@@ -129,6 +129,118 @@ export class CorrectionsService {
     };
   }
 
+  /**
+   * Raise a correction on somebody's behalf, from a counter (§66).
+   *
+   * `CORRECTION_REQUEST_CREATE` was granted to MDA_OFFICER and REVENUE_OFFICER,
+   * and the only route that performed it was the resident's own. So an officer
+   * looking at a record with a wrong address could see the mistake, tell the
+   * resident to go home and raise it themselves, and do nothing else.
+   *
+   * The officer's request is stored as theirs, with their agency, and goes to
+   * the same queue under the same review. Nothing is applied here.
+   */
+  async createOnBehalf(
+    actor: AuthenticatedActor,
+    pcid: string,
+    input: {
+      fieldPath: string;
+      requestedValue: string;
+      justification: string;
+      evidenceReference?: string | null;
+    },
+    context: RequestContext,
+  ): Promise<{ reference: string; status: string }> {
+    const citizen = await this.db.queryOne<{ id: string }>(
+      'SELECT id FROM citizen WHERE pcid = $1',
+      [pcid],
+    );
+
+    await this.policy.authorize({
+      actor,
+      action: 'CORRECTION_REQUEST_CREATE',
+      purpose: 'CORRECTION_REVIEW',
+      resource: {
+        type: 'CORRECTION_REQUEST',
+        id: citizen?.id ?? null,
+        classification: 'INTERNAL',
+        subjectPcid: pcid,
+      },
+      context,
+      auditDetail: { fieldPath: input.fieldPath, onBehalfOf: pcid },
+    });
+
+    if (citizen === null) throw AppError.notFoundOrNotPermitted(`no citizen ${pcid}`);
+
+    if (APPLICABLE_COLUMNS[input.fieldPath] === undefined) {
+      throw AppError.validation('That field cannot be corrected through this queue.', [
+        {
+          path: 'fieldPath',
+          message: `Correctable fields: ${Object.keys(APPLICABLE_COLUMNS).join(', ')}`,
+        },
+      ]);
+    }
+
+    const reference = await this.policy.nextReference('CORRECTION', 'COR');
+    const current = await this.db.queryOne<{ value: string | null }>(
+      `SELECT ${APPLICABLE_COLUMNS[input.fieldPath] as string}::text AS value
+         FROM citizen WHERE id = $1`,
+      [citizen.id],
+    );
+    await this.db.query(
+      `INSERT INTO correction_request (
+         reference, citizen_id, requested_by_type, requested_by_id, requesting_agency_id,
+         field_path, current_value, requested_value, justification, evidence_reference, status
+       ) VALUES ($1,$2,'GOVERNMENT_USER',$3,$4,$5,$6,$7,$8,$9,'SUBMITTED')`,
+      [
+        reference,
+        citizen.id,
+        actor.subject.userId,
+        actor.subject.agencyId,
+        input.fieldPath,
+        current?.value ?? null,
+        input.requestedValue,
+        input.justification,
+        input.evidenceReference ?? null,
+      ],
+    );
+
+    await this.audit.record({
+      action: 'CORRECTION_REQUEST_CREATE',
+      outcome: 'PERMITTED',
+      actorType: actor.subject.actorType,
+      actorId: actor.subject.userId,
+      actorDisplay: actor.displayName,
+      agencyId: actor.subject.agencyId,
+      agencyCode: actor.agencyCode,
+      roles: actor.subject.roles,
+      purpose: 'CORRECTION_REVIEW',
+      resourceType: 'CORRECTION_REQUEST',
+      resourceId: citizen.id,
+      subjectPcid: pcid,
+      correlationId: context.correlationId,
+      ipAddress: context.ipAddress,
+      detail: { reference, fieldPath: input.fieldPath, raisedOnBehalfOfResident: true },
+    });
+
+    // The resident is told that somebody asked for their record to be changed,
+    // before it is changed, so a correction raised without their knowledge is
+    // visible to them while it is still a request.
+    await this.db.query(
+      `INSERT INTO notification (channel, recipient_type, recipient_id, subject, body, classification)
+       VALUES ('IN_APP','CITIZEN',$1,$2,$3,'INTERNAL')`,
+      [
+        pcid,
+        `A government office has asked for a change to your record (${reference})`,
+        `${actor.agencyName ?? 'A government office'} asked for ${input.fieldPath} to be changed. ` +
+          'You will be told when it is decided. If you did not expect this, report it from the ' +
+          '"Report something" page.',
+      ],
+    );
+
+    return { reference, status: 'SUBMITTED' };
+  }
+
   async decide(
     actor: AuthenticatedActor,
     reference: string,

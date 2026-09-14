@@ -155,3 +155,10 @@ review path.
 Quote the `x-correlation-id` from the response. It ties your client log, the
 platform's operator log and the audit record together without anyone needing to
 exchange personal data.
+
+## Which entitlement a call needs
+
+Every operation in the published contract carries `x-pcid-actions`: the
+authorisation actions it performs. Read it before building against an endpoint —
+it tells you which role your agency's accounts need, rather than leaving you to
+discover it from a refusal in testing.

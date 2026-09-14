@@ -7,3 +7,5 @@ dist-test
 .next
 apps/portal/e2e/.artefacts
 apps/portal/e2e/.results
+apps/government/e2e/.artefacts
+apps/government/e2e/.results

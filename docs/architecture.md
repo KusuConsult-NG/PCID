@@ -15,22 +15,29 @@ and there is exactly one component that decides it.
 ## Components
 
 ```
-  Resident's                                ┌────────────────────────────────────────┐
-  browser  ──►  apps/portal  ─────────────► │            services/api                │
-                (server-rendered;           │                                        │
-                 holds the session,         │  Guard ─► Controller ─► PolicyService ─┼─► @pcid/policy
-                 no token in the browser)   │            │              │            │   (pure, no I/O)
-                                            │            │              ▼            │
-  MDA systems  ─────────────────────────►   │            │        AuditService ──────┼─► audit_event
-  Mobile apps  ─────────────────────────►   │            ▼                           │   (hash chained)
-                                            │        Domain service ─────────────────┼─► PostgreSQL
-                                            └────────────────────────────────────────┘
-                                                              ▲
-                                                              │ projections only,
-                                                       Integration adapters   never write-back
-                                                              ▲
-                                                        Agency systems
+  Resident's browser  ──►  apps/portal      ─┐
+                           (their own record) │
+                                              │   ┌────────────────────────────────────────┐
+  Officer's browser   ──►  apps/government   ─┼──►│            services/api                │
+                           (anybody's, under  │   │                                        │
+                            a stated purpose) │   │  Guard ─► Controller ─► PolicyService ─┼─► @pcid/policy
+                                              │   │            │              │            │   (pure, no I/O)
+  MDA systems  ───────────────────────────────┤   │            │              ▼            │
+  Mobile apps  ───────────────────────────────┘   │            │        AuditService ──────┼─► audit_event
+                                                  │            ▼                           │   (hash chained)
+                                                  │        Domain service ─────────────────┼─► PostgreSQL
+                                                  └────────────────────────────────────────┘
+                                                                      ▲
+                                                                      │ projections only,
+                                                               Integration adapters   never write-back
+                                                                      ▲
+                                                                Agency systems
 ```
+
+Both portals are server-rendered and hold their own session; neither puts a
+token in a browser. They share `packages/portal-kit` for exactly that reason -
+two copies of a session-sealing routine is one copy that quietly stops being
+reviewed.
 
 ### `packages/contracts` — the vocabulary
 
@@ -124,6 +131,32 @@ Everything works without JavaScript. Forms are Server Actions, navigation is
 links, and the single client component is a submit button that dims while a form
 is in flight. A resident on a cheap phone on a bad connection is the normal case,
 not the edge case.
+
+### `apps/government` — what an officer sees
+
+The same back-end-for-front-end shape as the citizen portal, for a stronger
+reason: the token this application holds opens other people's records.
+
+Three things about it are worth stating because they are design positions, not
+implementation details.
+
+**The navigation is built from the account's resolved entitlements**, read from
+`/auth/me` — which is the list the policy engine itself reads. A registration
+desk is not shown an audit trail; an auditor is not shown a registration form.
+That is not tidiness: a menu of twenty items of which three work teaches people
+to click and see, which is precisely the habit a purpose-bound system cannot
+afford. It remains a rendering decision and never an authorisation one — every
+request is authorised again at the API, so a stale entitlement list shows a link
+that does not work rather than opening something it should not.
+
+**The purpose is part of the act, not a setting.** A record cannot be opened
+without one; the chosen purpose stays on screen for as long as the record is,
+because it is what decided the contents of the page and what was written down
+against the officer's name.
+
+**A withheld card is shown as withheld.** An officer who cannot tell the
+difference between "no property is registered to this person" and "you may not
+see their property" will draw the wrong conclusion from a blank page (§29).
 
 ## Decisions worth explaining
 
@@ -250,12 +283,12 @@ local state, so a move to Kubernetes is a deployment change rather than a redesi
 
 ## What is not built yet
 
-The API and the citizen portal are the surface today. Still to build:
+The API and the two portals are the surface today. Still to build:
 
-- **Web portals** for government users, security agencies and emergency services.
-  The API returns everything they need, including which cards are restricted and
-  why, so each interface can say "Restricted information" honestly — which is
-  what the citizen portal already does.
+- **Web portals** for security agencies and emergency services. The API returns
+  everything they need, including which cards are restricted and why, so each
+  interface can say "Restricted information" honestly — which is what the
+  citizen and government portals already do.
 - **Mobile applications** for citizens, field officers and responders, including
   the controlled offline mode described in §56 — encrypted, expiring,
   device-bound, minimal, revocable, and never a copy of the registry.

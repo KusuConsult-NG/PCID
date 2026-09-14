@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { z } from 'zod';
 
@@ -6,6 +6,7 @@ import { contextOf } from '../common/correlation';
 import {
   agencySchema,
   agencyStatusSchema,
+  changePasswordSchema,
   classificationSchema,
   userQueueSchema,
   uuidSchema,
@@ -14,6 +15,7 @@ import { documentRoute } from '../common/openapi/registry';
 import { validate } from '../common/zod-validation.pipe';
 import { Actor, RequiresStepUp } from './actor';
 import type { AuthenticatedActor } from './actor';
+import { GovernmentAccountService } from './account.service';
 import { AdminService } from './admin.service';
 import type { CreateAgencyInput, CreateUserInput } from './admin.service';
 
@@ -117,10 +119,41 @@ documentRoute({
   summary: 'Confirm your own authenticator enrolment',
   body: confirmMfaSchema,
 });
+documentRoute({
+  method: 'post',
+  path: '/api/v1/users/me/password',
+  tag: 'Administration',
+  summary: 'Change your own passphrase',
+  description:
+    'An account is created with a passphrase an administrator chose and typed, and is flagged to ' +
+    'change it. This is how it gets changed: until it is, the officer and the administrator share ' +
+    'the secret. Changing it ends every other session for the account.',
+  body: changePasswordSchema,
+});
+documentRoute({
+  method: 'get',
+  path: '/api/v1/users/me/sessions',
+  tag: 'Administration',
+  summary: 'Where your own account is currently signed in',
+  description:
+    'Deliberately coarse about the device. A fingerprint precise enough to be useful here would be ' +
+    'precise enough to track somebody with.',
+});
+documentRoute({
+  method: 'delete',
+  path: '/api/v1/users/me/sessions/:sessionId',
+  tag: 'Administration',
+  summary: 'End one of your own sessions',
+  description: 'For the counter machine you walked away from.',
+  parameters: [{ name: 'sessionId', in: 'path', description: 'Session id.' }],
+});
 
 @Controller('api/v1')
 export class AdminController {
-  constructor(private readonly admin: AdminService) {}
+  constructor(
+    private readonly admin: AdminService,
+    private readonly accounts: GovernmentAccountService,
+  ) {}
 
   @Get('agencies')
   async listAgencies(
@@ -183,6 +216,34 @@ export class AdminController {
   ): Promise<unknown> {
     const input = validate(compartmentSchema, body);
     return this.admin.grantCompartment(actor, agencyId, input.legalBasis, contextOf(request));
+  }
+
+  @Post('users/me/password')
+  async changeOwnPassword(
+    @Actor() actor: AuthenticatedActor,
+    @Body() body: unknown,
+    @Req() request: Request,
+  ): Promise<unknown> {
+    const input = validate(changePasswordSchema, body);
+    return this.accounts.changePassword(
+      actor,
+      { currentPassword: input.currentPassword, newPassword: input.newPassword },
+      contextOf(request),
+    );
+  }
+
+  @Get('users/me/sessions')
+  async ownSessions(@Actor() actor: AuthenticatedActor): Promise<unknown> {
+    return this.accounts.listSessions(actor);
+  }
+
+  @Delete('users/me/sessions/:sessionId')
+  async endOwnSession(
+    @Actor() actor: AuthenticatedActor,
+    @Param('sessionId') sessionId: string,
+    @Req() request: Request,
+  ): Promise<unknown> {
+    return this.accounts.revokeSession(actor, sessionId, contextOf(request));
   }
 
   @Get('users')

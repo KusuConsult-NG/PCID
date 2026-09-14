@@ -272,6 +272,13 @@ export const correctionDecisionSchema = z.object({
   note: z.string().min(5).max(2000),
 });
 
+export const correctionOnBehalfSchema = z.object({
+  fieldPath: z.string().min(3).max(64),
+  requestedValue: z.string().min(1).max(500),
+  justification: z.string().min(5).max(2000),
+  evidenceReference: z.string().max(128).nullish(),
+});
+
 export const alertQueueSchema = paginationSchema.extend({
   status: z
     .enum(['OPEN', 'UNDER_REVIEW', 'ACTIONED', 'DISMISSED_FALSE_POSITIVE', 'CLOSED'])

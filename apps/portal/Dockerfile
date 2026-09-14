@@ -14,6 +14,7 @@ WORKDIR /build
 
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY apps/portal/package.json apps/portal/
+COPY packages/portal-kit/package.json packages/portal-kit/
 COPY packages/contracts/package.json packages/contracts/
 COPY packages/policy/package.json packages/policy/
 COPY services/api/package.json services/api/
